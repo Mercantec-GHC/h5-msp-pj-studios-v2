@@ -20,6 +20,7 @@ logs/
 # .NET secrets
 secrets.json
 appsettings.Development.json
+appsettings.json
 
 # Publish output
 publish/
