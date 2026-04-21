@@ -35,6 +35,7 @@ wwwroot/build/
 **/wwwroot/js/
 **/wwwroot/_framework/
 **/wwwroot/_content/
+wwwroot/lib/
 
 # Node / frontend tooling (if used)
 node_modules/
