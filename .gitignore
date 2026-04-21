@@ -2,3 +2,49 @@
 /site/
 /.vscode
 */node_modules/
+
+# Build artifacts
+bin/
+obj/
+out/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# Logs
+*.log
+logs/
+
+# .NET secrets
+secrets.json
+appsettings.Development.json
+
+# Publish output
+publish/
+wwwroot/dist/
+wwwroot/build/
+
+# Blazor specific
+# (Client-side build artifacts)
+**/bin/
+**/obj/
+**/wwwroot/css/
+**/wwwroot/js/
+**/wwwroot/_framework/
+**/wwwroot/_content/
+
+# Node / frontend tooling (if used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.*
+
+# Docker
+*.pid
+*.tar
+docker-compose
