@@ -1,0 +1,8 @@
+.auth-page-login {
+    background: radial-gradient(circle at top right, #e8f1ff 0%, #f8fbff 45%, #ffffff 100%);
+}
+
+.auth-card-login {
+    max-width: 480px;
+    border-color: #dce8ff;
+}

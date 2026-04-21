@@ -1,0 +1,114 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using Frontend.Services
+@inject AuthService AuthService
+
+<PageTitle>Login</PageTitle>
+
+<div class="auth-page auth-page-login">
+	<div class="card auth-card auth-card-login shadow-sm">
+		<div class="card-body p-4 p-md-5">
+			<h1 class="h3 mb-2">Log ind</h1>
+			<p class="text-muted mb-4">Velkommen tilbage. Indtast dine oplysninger for at fortsætte.</p>
+
+			<EditForm Model="_model" OnValidSubmit="HandleLogin">
+				<DataAnnotationsValidator />
+				<ValidationSummary class="text-danger mb-3" />
+
+				@if (!string.IsNullOrEmpty(_errorMessage))
+				{
+					<div class="alert alert-danger mb-3" role="alert">
+						@_errorMessage
+					</div>
+				}
+
+				<div class="mb-3">
+					<label class="form-label" for="email">Email</label>
+					<InputText id="email" class="form-control" @bind-Value="_model.Email" />
+					<ValidationMessage For="() => _model.Email" class="text-danger" />
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="password">Kodeord</label>
+					<InputText id="password" type="password" class="form-control" @bind-Value="_model.Password" />
+					<ValidationMessage For="() => _model.Password" class="text-danger" />
+				</div>
+
+				<div class="d-flex justify-content-between align-items-center mb-4">
+					<div class="form-check">
+						<InputCheckbox id="remember" class="form-check-input" @bind-Value="_model.RememberMe" />
+						<label class="form-check-label" for="remember">Husk mig</label>
+					</div>
+					<a href="#" class="small">Glemt kodeord?</a>
+				</div>
+
+				<button type="submit" class="btn btn-primary w-100" disabled="@_isLoading">
+					@if (_isLoading)
+					{
+						<text>
+							<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+							Logger ind...
+						</text>
+					}
+					else
+					{
+						<text>Log ind</text>
+					}
+				</button>
+			</EditForm>
+
+			@if (!string.IsNullOrEmpty(_successMessage))
+			{
+				<div class="alert alert-success mt-3 mb-0" role="alert">
+					@_successMessage
+				</div>
+			}
+
+			<p class="text-center mt-4 mb-0">
+				Har du ikke en bruger? <a href="signup">Opret dig her</a>
+			</p>
+		</div>
+	</div>
+</div>
+
+@code {
+	private readonly LoginModel _model = new();
+	private bool _isLoading;
+	private string _errorMessage = string.Empty;
+	private string _successMessage = string.Empty;
+
+	private async Task HandleLogin()
+	{
+		_isLoading = true;
+		_errorMessage = string.Empty;
+		_successMessage = string.Empty;
+
+		var result = await AuthService.LoginAsync(_model.Email, _model.Password);
+		
+		_isLoading = false;
+
+		if (result.Success)
+		{
+			_successMessage = "Login godkendt. Viderestiller...";
+			// TODO: Gem token, rediriger bruger
+			// NavigationManager.NavigateTo("/dashboard");
+		}
+		else
+		{
+			_errorMessage = result.Message;
+		}
+	}
+
+	private sealed class LoginModel
+	{
+		[Required(ErrorMessage = "Email er påkrævet.")]
+		[EmailAddress(ErrorMessage = "Indtast en gyldig email.")]
+		public string Email { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Kodeord er påkrævet.")]
+		[MinLength(6, ErrorMessage = "Kodeord skal mindst være 6 tegn.")]
+		public string Password { get; set; } = string.Empty;
+
+		public bool RememberMe { get; set; }
+	}
+}

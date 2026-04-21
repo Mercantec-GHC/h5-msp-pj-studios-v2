@@ -1,0 +1,124 @@
+@page "/signup"
+@using System.ComponentModel.DataAnnotations
+@using Frontend.Services
+@inject AuthService AuthService
+
+<PageTitle>Sign up</PageTitle>
+
+<div class="auth-page auth-page-signup">
+	<div class="card auth-card auth-card-signup shadow-sm">
+		<div class="card-body p-4 p-md-5">
+			<h1 class="h3 mb-2">Opret bruger</h1>
+			<p class="text-muted mb-4">Udfyld felterne herunder for at oprette en konto.</p>
+
+			<EditForm Model="_model" OnValidSubmit="HandleSignUp">
+				<DataAnnotationsValidator />
+				<ValidationSummary class="text-danger mb-3" />
+
+				@if (!string.IsNullOrEmpty(_errorMessage))
+				{
+					<div class="alert alert-danger mb-3" role="alert">
+						@_errorMessage
+					</div>
+				}
+
+				<div class="mb-3">
+					<label class="form-label" for="fullName">Navn</label>
+					<InputText id="fullName" class="form-control" @bind-Value="_model.FullName" />
+					<ValidationMessage For="() => _model.FullName" class="text-danger" />
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="email">Email</label>
+					<InputText id="email" class="form-control" @bind-Value="_model.Email" />
+					<ValidationMessage For="() => _model.Email" class="text-danger" />
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="password">Kodeord</label>
+					<InputText id="password" type="password" class="form-control" @bind-Value="_model.Password" />
+					<ValidationMessage For="() => _model.Password" class="text-danger" />
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="confirmPassword">Bekræft kodeord</label>
+					<InputText id="confirmPassword" type="password" class="form-control" @bind-Value="_model.ConfirmPassword" />
+					<ValidationMessage For="() => _model.ConfirmPassword" class="text-danger" />
+				</div>
+
+				<button type="submit" class="btn btn-success w-100" disabled="@_isLoading">
+					@if (_isLoading)
+					{
+						<text>
+							<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+							Opretter konto...
+						</text>
+					}
+					else
+					{
+						<text>Opret konto</text>
+					}
+				</button>
+			</EditForm>
+
+			@if (!string.IsNullOrEmpty(_successMessage))
+			{
+				<div class="alert alert-success mt-3 mb-0" role="alert">
+					@_successMessage
+				</div>
+			}
+
+			<p class="text-center mt-4 mb-0">
+				Har du allerede en bruger? <a href="login">Log ind her</a>
+			</p>
+		</div>
+	</div>
+</div>
+
+@code {
+	private readonly SignUpModel _model = new();
+	private bool _isLoading;
+	private string _errorMessage = string.Empty;
+	private string _successMessage = string.Empty;
+
+	private async Task HandleSignUp()
+	{
+		_isLoading = true;
+		_errorMessage = string.Empty;
+		_successMessage = string.Empty;
+
+		var result = await AuthService.SignUpAsync(_model.FullName, _model.Email, _model.Password);
+		
+		_isLoading = false;
+
+		if (result.Success)
+		{
+			_successMessage = "Bruger oprettet. Viderestiller...";
+			// TODO: Gem token, rediriger bruger
+			// NavigationManager.NavigateTo("/login");
+		}
+		else
+		{
+			_errorMessage = result.Message;
+		}
+	}
+
+	private sealed class SignUpModel
+	{
+		[Required(ErrorMessage = "Navn er påkrævet.")]
+		[MinLength(2, ErrorMessage = "Navn skal mindst være 2 tegn.")]
+		public string FullName { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Email er påkrævet.")]
+		[EmailAddress(ErrorMessage = "Indtast en gyldig email.")]
+		public string Email { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Kodeord er påkrævet.")]
+		[MinLength(8, ErrorMessage = "Kodeord skal mindst være 8 tegn.")]
+		public string Password { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Bekræft kodeord.")]
+		[Compare(nameof(Password), ErrorMessage = "Kodeordene matcher ikke.")]
+		public string ConfirmPassword { get; set; } = string.Empty;
+	}
+}
