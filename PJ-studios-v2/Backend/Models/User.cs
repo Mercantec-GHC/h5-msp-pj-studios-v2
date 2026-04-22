@@ -18,14 +18,25 @@ namespace Backend.Models
 
     public class RegisterUserDTO
     {
-        [Required]
+        [Required(ErrorMessage = "Username is required.")]
         public string Username { get; set; }
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
         public string Email { get; set; }
-        [Required]
+        [Required(ErrorMessage = "Password is required.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*\W).{8,32}$",
+            ErrorMessage = "Password must be 8–32 chars and include upper, lower, digit, and special character.")]
         public string Password { get; set; }
-        [Required]
+        [Required(ErrorMessage = "Password confirmation is required.")]
+        [Compare("Password", ErrorMessage = "Passwords do not match.")]
         public string PasswordConfirm { get; set; }
+    }
+
+    public class LoginUserDTO
+    {
+        [Required(ErrorMessage = "Email is required")]
+        public string Email { get; set; }
+        [Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; }
     }
 }

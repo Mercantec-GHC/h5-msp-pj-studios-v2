@@ -1,19 +1,22 @@
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
 var jwt = builder.Configuration.GetSection("Jwt");
-
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
 
-var app = builder.Build();
+builder.Services.AddControllers();
 
+builder.Services.AddOpenApi();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
+// Authentication + JWT
 builder.Services
     .AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
@@ -27,16 +30,12 @@ builder.Services
             ValidIssuer = jwt["Issuer"],
             ValidAudience = jwt["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwt["Key"]!))
+                Encoding.UTF8.GetBytes(jwt["Key"]!)
+            )
         };
     });
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
+// Swagger + JWT support
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "Backend", Version = "v1" });
@@ -77,11 +76,18 @@ builder.Services.AddCors(options =>
     });
 });
 
+var app = builder.Build();
+
+app.MapOpenApi();
+
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
+app.UseCors(FrontendCorsPolicy);
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
