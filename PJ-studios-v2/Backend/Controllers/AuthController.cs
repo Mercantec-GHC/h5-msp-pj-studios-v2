@@ -1,4 +1,5 @@
 ﻿using Backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -62,9 +63,9 @@ namespace Backend.Controllers
             User user = await _context.Users.SingleOrDefaultAsync(u => u.Email == DTO.Email);
             if (user == null || !BCrypt.Net.BCrypt.Verify(DTO.Password, user.PasswordHash))
             {
-                return Unauthorized("Invalid email or password");
+                return BadRequest("Invalid email or password");
             }
-            
+
             var token = GenerateToken(user);
 
             return Ok(new { Token = token });
@@ -94,6 +95,25 @@ namespace Backend.Controllers
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        [Authorize]
+        [HttpDelete("deleteUser")]
+        public async Task<IActionResult> DeleteUser()
+        {
+            string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+            {
+                return BadRequest("User not found");
+            }
+            User? user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return BadRequest("User not found");
+            }
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+            return Ok("User deleted successfully!");
         }
     }
 }
