@@ -39,4 +39,22 @@ namespace Backend.Models
         [Required(ErrorMessage = "Password is required")]
         public string Password { get; set; }
     }
+
+    public class UpdateUserInfoDTO
+    {
+        public string Username { get; set; }
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
+        public string Email { get; set; }
+    }
+
+    public class UpdateUserPasswordDTO
+    {
+        [Required(ErrorMessage = "Password is required.")]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*\W).{8,32}$",
+            ErrorMessage = "Password must be 8–32 chars and include upper, lower, digit, and special character.")]
+        public string Password { get; set; }
+        [Required(ErrorMessage = "Password confirmation is required.")]
+        [Compare("Password", ErrorMessage = "Passwords do not match.")]
+        public string PasswordConfirm { get; set; }
+    }
 }
