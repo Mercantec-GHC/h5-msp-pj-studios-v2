@@ -2,11 +2,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Update;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
+using Backend.Data;
 
 namespace Backend.Controllers
 {
@@ -21,6 +24,42 @@ namespace Backend.Controllers
         {
             _context = context;
             _configuration = configuration;
+        }
+
+        [HttpGet("ListOfAllUsers")] // For demo purposes only, not recommended for production
+        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        {
+            try
+            {
+                return await _context.Users.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Database error", error = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+            {
+                return BadRequest("User not found");
+            }
+            User? user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return BadRequest("User not found");
+            }
+
+            var DTO = new UserDTO
+            {
+                Username = user.Username,
+                Email = user.Email
+            };
+
+            return Ok(DTO);
         }
 
         [HttpPost("register")]
@@ -68,7 +107,12 @@ namespace Backend.Controllers
 
             var token = GenerateToken(user);
 
-            return Ok(new { Token = token });
+            var refreshToken = GenerateRefreshToken();
+            refreshToken.UserId = user.ID;
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Token = token, RefreshToken = refreshToken.Token });
         }
 
         private string GenerateToken(User user)
@@ -96,6 +140,58 @@ namespace Backend.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> RefreshToken([FromBody] string refreshToken)
+        {
+            var existingToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .SingleOrDefaultAsync(rt => rt.Token == refreshToken);
+
+            if (existingToken == null ||
+                existingToken.IsRevoked ||
+                existingToken.ExpiryDate < DateTime.UtcNow)
+            {
+                return BadRequest("Invalid or expired refresh token");
+            }
+
+            // revoke old token
+            existingToken.IsRevoked = true;
+
+            var newRefreshToken = GenerateRefreshToken();
+            newRefreshToken.UserId = existingToken.UserId;
+
+            _context.RefreshTokens.Add(newRefreshToken);
+
+            // create new JWT
+            var newJwt = GenerateToken(existingToken.User);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                Token = newJwt,
+                RefreshToken = newRefreshToken.Token
+            });
+        }
+
+
+        private RefreshToken GenerateRefreshToken()
+        {
+            var randomBytes = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+
+            return new RefreshToken
+            {
+                Id = Guid.NewGuid().ToString(),
+                Token = Convert.ToBase64String(randomBytes),
+                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                IsRevoked = false
+            };
+        }
+
 
         [Authorize]
         [HttpPatch("updateUser")]
@@ -171,6 +267,8 @@ namespace Backend.Controllers
 
             return Ok("Password updated successfully!");
         }
+
+
 
         [Authorize]
         [HttpDelete("deleteUser")]
