@@ -202,12 +202,6 @@ namespace Backend.Controllers
                 return BadRequest("No data provided.");
             }
 
-            var userIdClaim = User.FindFirst("userId")?.Value;
-            if (userIdClaim == null)
-            {
-                return Unauthorized("Missing userId claim.");
-            }
-
             string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
 
             var user = await _context.Users.FindAsync(userId);
@@ -216,15 +210,21 @@ namespace Backend.Controllers
                 return NotFound("User not found.");
             }
 
+            if (userId == null)
+            {
+                return Unauthorized("Missing userId claim.");
+            }
+
+
             bool updated = false;
 
-            if (!string.IsNullOrWhiteSpace(dto.Username))
+            if (!string.IsNullOrWhiteSpace(dto.Username) || dto.Username != "string")
             {
                 user.Username = dto.Username;
                 updated = true;
             }
 
-            if (!string.IsNullOrWhiteSpace(dto.Email))
+            if (!string.IsNullOrWhiteSpace(dto.Email) || dto.Email != "user@example.com")
             {
                 user.Email = dto.Email;
                 updated = true;
