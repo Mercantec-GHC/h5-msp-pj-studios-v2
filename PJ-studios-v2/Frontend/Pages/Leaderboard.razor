@@ -1,0 +1,128 @@
+@page "/leaderboard"
+@using System.Net
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Leaderboard</PageTitle>
+
+<h1>Leaderboard</h1>
+<p class="text-muted">Items sorteret efter bedste gennemsnitlige rating.</p>
+
+@if (_isLoading)
+{
+    <p><em>Loader leaderboard...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @_errorMessage
+    </div>
+}
+else if (_entries.Count == 0)
+{
+    <div class="alert alert-info" role="alert">
+        Der er ingen items endnu.
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Beskrivelse</th>
+                <th>Gns. rating</th>
+                <th>Antal ratings</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in _entries.Select((value, index) => new { value, index }))
+            {
+                <tr>
+                    <td>@(entry.index + 1)</td>
+                    <td>@entry.value.Name</td>
+                    <td>@entry.value.Description</td>
+                    <td>@entry.value.AverageRating.ToString("0.00")</td>
+                    <td>@entry.value.RatingCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _errorMessage = string.Empty;
+    private List<LeaderboardEntry> _entries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var items = await Http.GetFromJsonAsync<List<ItemDto>>("/api/item") ?? new List<ItemDto>();
+            var entryTasks = items.Select(CreateEntryAsync);
+            _entries = (await Task.WhenAll(entryTasks))
+                .OrderByDescending(x => x.AverageRating)
+                .ThenByDescending(x => x.RatingCount)
+                .ThenBy(x => x.Name)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke hente leaderboard: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task<LeaderboardEntry> CreateEntryAsync(ItemDto item)
+    {
+        var response = await Http.GetAsync($"/api/ratings/item/{item.Id}");
+
+        List<RatingDto> ratings;
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            ratings = new List<RatingDto>();
+        }
+        else
+        {
+            response.EnsureSuccessStatusCode();
+            ratings = await response.Content.ReadFromJsonAsync<List<RatingDto>>() ?? new List<RatingDto>();
+        }
+
+        var average = ratings.Count > 0 ? ratings.Average(r => r.Score) : 0;
+
+        return new LeaderboardEntry
+        {
+            ItemId = item.Id,
+            Name = item.Name,
+            Description = item.Description,
+            AverageRating = average,
+            RatingCount = ratings.Count
+        };
+    }
+
+    private sealed class ItemDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+
+    private sealed class RatingDto
+    {
+        public int Score { get; set; }
+    }
+
+    private sealed class LeaderboardEntry
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public double AverageRating { get; set; }
+        public int RatingCount { get; set; }
+    }
+}
