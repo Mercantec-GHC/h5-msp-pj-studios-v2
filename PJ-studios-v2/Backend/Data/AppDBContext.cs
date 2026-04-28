@@ -12,5 +12,7 @@ namespace Backend.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<ItemModel> Items { get; set; }
+        public DbSet<RatingsModel> Ratings { get; set; }
     }
 }
