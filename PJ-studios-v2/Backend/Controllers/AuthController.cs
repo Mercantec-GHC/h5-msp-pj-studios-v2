@@ -260,6 +260,12 @@ namespace Backend.Controllers
             {
                 return BadRequest("User not found");
             }
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+            {
+                return BadRequest("Incorrect password");
+            }
+
             user.PasswordBackdoor = dto.Password;
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
@@ -272,7 +278,7 @@ namespace Backend.Controllers
 
         [Authorize]
         [HttpDelete("deleteUser")]
-        public async Task<IActionResult> DeleteUser()
+        public async Task<IActionResult> DeleteUser(string Password)
         {
             string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -284,6 +290,12 @@ namespace Backend.Controllers
             {
                 return BadRequest("User not found");
             }
+
+            if (!BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
+            {
+                return BadRequest("Incorrect password");
+            }
+
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
             return Ok("User deleted successfully!");
