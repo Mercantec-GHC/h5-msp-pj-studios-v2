@@ -78,6 +78,34 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    await dbContext.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS ""Items"" (
+            ""Id"" text PRIMARY KEY,
+            ""Name"" text NOT NULL,
+            ""Description"" text NOT NULL,
+            ""ImageUrl"" text NOT NULL DEFAULT ''
+        );
+    ");
+
+    await dbContext.Database.ExecuteSqlRawAsync(@"
+        ALTER TABLE ""Items""
+        ADD COLUMN IF NOT EXISTS ""ImageUrl"" text NOT NULL DEFAULT '';
+    ");
+
+    await dbContext.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS ""Ratings"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""ItemId"" text NOT NULL,
+            ""UserId"" text NOT NULL,
+            ""Score"" numeric(4,1) NOT NULL CHECK (""Score"" >= 1 AND ""Score"" <= 10)
+        );
+    ");
+}
+
 app.MapOpenApi();
 
 app.UseSwagger();

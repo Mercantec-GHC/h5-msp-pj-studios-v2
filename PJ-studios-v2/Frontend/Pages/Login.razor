@@ -2,6 +2,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Frontend.Services
 @inject AuthService AuthService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Login</PageTitle>
 
@@ -90,8 +91,13 @@
 		if (result.Success)
 		{
 			_successMessage = "Login godkendt. Viderestiller...";
-			// TODO: Gem token, rediriger bruger
-			// NavigationManager.NavigateTo("/dashboard");
+			if (!string.IsNullOrWhiteSpace(result.Token))
+			{
+				await AuthService.SaveTokenAsync(result.Token);
+				await AuthService.SaveUserIdFromTokenAsync(result.Token);
+			}
+
+			NavigationManager.NavigateTo("/leaderboard");
 		}
 		else
 		{
