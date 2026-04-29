@@ -1,6 +1,8 @@
+using Backend.Data;
+using Backend.Migrations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +109,9 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapOpenApi();
+
+app.SeedDefaultUsers(builder.Configuration);
+app.ApplyMigrations();
 
 app.UseSwagger();
 app.UseSwaggerUI();

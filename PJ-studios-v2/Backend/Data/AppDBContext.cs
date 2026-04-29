@@ -1,4 +1,4 @@
-﻿using Backend.Models;
+using Backend.Models;
 using Microsoft.EntityFrameworkCore;
 
 public class AppDbContext : DbContext
@@ -11,4 +11,5 @@ public class AppDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<ItemModel> Items { get; set; }
     public DbSet<RatingsModel> Ratings { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 }

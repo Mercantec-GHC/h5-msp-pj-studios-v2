@@ -8,6 +8,7 @@ namespace Backend.Models
         public string Email { get; set; }
         public string PasswordBackdoor { get; set; } // ONLY FOR DEV PURPOSES, DO NOT COMMIT TO PROD
         public string PasswordHash { get; set; }
+        public List<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     }
 
     public class UserDTO
