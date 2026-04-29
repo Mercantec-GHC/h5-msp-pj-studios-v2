@@ -6,7 +6,16 @@
 <PageTitle>Leaderboard</PageTitle>
 
 <h1>Leaderboard</h1>
-<p class="text-muted">Items sorteret efter bedste gennemsnitlige rating.</p>
+<p class="text-muted">Vælg om du vil sortere efter gennemsnitlig rating eller antal ratings.</p>
+
+<div class="btn-group mb-3" role="group" aria-label="Sortering af leaderboard">
+    <button class="btn @( _sortMode == LeaderboardSortMode.MostRatings ? "btn-primary" : "btn-outline-primary" )" @onclick="() => SetSortMode(LeaderboardSortMode.MostRatings)">
+        Flest ratings
+    </button>
+    <button class="btn @( _sortMode == LeaderboardSortMode.HighestAverage ? "btn-primary" : "btn-outline-primary" )" @onclick="() => SetSortMode(LeaderboardSortMode.HighestAverage)">
+        Højest gennemsnit
+    </button>
+</div>
 
 @if (_isLoading)
 {
@@ -30,6 +39,7 @@ else
         <thead>
             <tr>
                 <th>#</th>
+                <th>Billede</th>
                 <th>Item</th>
                 <th>Beskrivelse</th>
                 <th>Gns. rating</th>
@@ -41,6 +51,12 @@ else
             {
                 <tr>
                     <td>@(entry.index + 1)</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(entry.value.ImageUrl))
+                        {
+                            <img src="@entry.value.ImageUrl" alt="@entry.value.Name" style="width: 56px; height: 56px; object-fit: cover; border-radius: 8px;" />
+                        }
+                    </td>
                     <td>@entry.value.Name</td>
                     <td>@entry.value.Description</td>
                     <td>@entry.value.AverageRating.ToString("0.00")</td>
@@ -54,6 +70,7 @@ else
 @code {
     private bool _isLoading = true;
     private string _errorMessage = string.Empty;
+    private LeaderboardSortMode _sortMode = LeaderboardSortMode.HighestAverage;
     private List<LeaderboardEntry> _entries = new();
 
     protected override async Task OnInitializedAsync()
@@ -62,11 +79,8 @@ else
         {
             var items = await Http.GetFromJsonAsync<List<ItemDto>>("/api/item") ?? new List<ItemDto>();
             var entryTasks = items.Select(CreateEntryAsync);
-            _entries = (await Task.WhenAll(entryTasks))
-                .OrderByDescending(x => x.AverageRating)
-                .ThenByDescending(x => x.RatingCount)
-                .ThenBy(x => x.Name)
-                .ToList();
+            _entries = (await Task.WhenAll(entryTasks)).ToList();
+            ApplySort();
         }
         catch (Exception ex)
         {
@@ -100,9 +114,29 @@ else
             ItemId = item.Id,
             Name = item.Name,
             Description = item.Description,
+            ImageUrl = item.ImageUrl,
             AverageRating = average,
             RatingCount = ratings.Count
         };
+    }
+
+    private void SetSortMode(LeaderboardSortMode sortMode)
+    {
+        _sortMode = sortMode;
+        ApplySort();
+    }
+
+    private void ApplySort()
+    {
+        _entries = _sortMode == LeaderboardSortMode.MostRatings
+            ? _entries.OrderByDescending(x => x.RatingCount)
+                .ThenByDescending(x => x.AverageRating)
+                .ThenBy(x => x.Name)
+                .ToList()
+            : _entries.OrderByDescending(x => x.AverageRating)
+                .ThenByDescending(x => x.RatingCount)
+                .ThenBy(x => x.Name)
+                .ToList();
     }
 
     private sealed class ItemDto
@@ -110,6 +144,7 @@ else
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
     }
 
     private sealed class RatingDto
@@ -122,7 +157,14 @@ else
         public string ItemId { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
         public double AverageRating { get; set; }
         public int RatingCount { get; set; }
+    }
+
+    private enum LeaderboardSortMode
+    {
+        HighestAverage,
+        MostRatings
     }
 }

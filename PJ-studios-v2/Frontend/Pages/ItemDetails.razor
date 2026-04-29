@@ -1,0 +1,214 @@
+@page "/item/{ItemId}"
+@using System.Net.Http.Json
+@using Frontend.Services
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Item detaljer</PageTitle>
+
+@if (_isLoading)
+{
+    <p><em>Loader item...</em></p>
+}
+else if (_item == null)
+{
+    <div class="alert alert-danger" role="alert">Item ikke fundet.</div>
+    <a href="/items" class="btn btn-secondary">Tilbage til items</a>
+}
+else
+{
+    <div class="mb-3">
+        <a href="/items" class="btn btn-secondary btn-sm">← Tilbage</a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            @if (!string.IsNullOrWhiteSpace(_item.ImageUrl))
+            {
+                <img src="@_item.ImageUrl" alt="@_item.Name" style="max-width: 100%; border-radius: 8px; margin-bottom: 20px;" />
+            }
+        </div>
+        <div class="col-md-6">
+            <h1>@_item.Name</h1>
+            <p class="text-muted">@_item.Description</p>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@_errorMessage</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_successMessage))
+            {
+                <div class="alert alert-success" role="alert">@_successMessage</div>
+            }
+
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">@(_hasExistingRating ? "Opdater din rating" : "Sæt din rating")</h5>
+                    <div class="mb-3">
+                        <label class="form-label" for="ratingScore">Score (1.0-10.0)</label>
+                        <input id="ratingScore" type="number" class="form-control" min="1" max="10" step="0.1" @bind="_ratingScore" />
+                        <div class="text-center mt-2">
+                            <span style="font-size: 24px; font-weight: bold;">@_ratingScore.ToString("0.0")</span> / 10
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100" @onclick="SubmitRatingAsync" disabled="@_isSubmittingRating">
+                        @(_isSubmittingRating ? "Gemmer rating..." : _hasExistingRating ? "Opdater rating" : "Gem rating")
+                    </button>
+                </div>
+            </div>
+
+            @if (_allRatings.Count > 0)
+            {
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Alle ratings</h5>
+                        <p class="text-muted">Gennemsnitlig score: <strong>@_allRatings.Average(r => r.Score).ToString("0.0")</strong> / 10</p>
+                        <div class="list-group list-group-sm">
+                            @foreach (var rating in _allRatings.OrderByDescending(r => r.Id))
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center gap-3">
+                                        <div>
+                                            <div class="fw-semibold">@rating.Username</div>
+                                        </div>
+                                        <span class="badge bg-secondary">@rating.Score.ToString("0.0")</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string ItemId { get; set; } = string.Empty;
+
+    private bool _hasExistingRating;
+    private ItemDto? _item;
+    private decimal _ratingScore = 5.0m;
+    private bool _isLoading = true;
+    private bool _isSubmittingRating;
+    private string _errorMessage = string.Empty;
+    private string _successMessage = string.Empty;
+    private List<RatingDto> _allRatings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItemAsync();
+    }
+
+    private async Task LoadItemAsync()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _allRatings = new List<RatingDto>();
+        _hasExistingRating = false;
+        _ratingScore = 5.0m;
+
+        try
+        {
+            _item = await Http.GetFromJsonAsync<ItemDto>($"/api/item/{ItemId}");
+
+            if (_item != null)
+            {
+                var response = await Http.GetAsync($"/api/ratings/item/{ItemId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    _allRatings = await response.Content.ReadFromJsonAsync<List<RatingDto>>() ?? new List<RatingDto>();
+                }
+
+                var userId = await AuthService.GetUserIdAsync();
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    var existingRating = _allRatings.FirstOrDefault(r => r.UserId == userId);
+                    _hasExistingRating = existingRating != null;
+                    if (existingRating != null)
+                    {
+                        _ratingScore = existingRating.Score;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke hente item: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SubmitRatingAsync()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+
+        var userId = await AuthService.GetUserIdAsync();
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            _errorMessage = "Du skal være logget ind for at give en rating.";
+            return;
+        }
+
+        _isSubmittingRating = true;
+        try
+        {
+            var request = new CreateRatingRequest
+            {
+                ItemId = ItemId,
+                UserId = userId,
+                Score = _ratingScore
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/ratings", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke gemme rating: {(int)response.StatusCode}";
+                return;
+            }
+
+            _successMessage = "Rating gemt!";
+            await LoadItemAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fejl: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingRating = false;
+        }
+    }
+
+    private sealed class ItemDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+    }
+
+    private sealed class RatingDto
+    {
+        public int Id { get; set; }
+        public string ItemId { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public decimal Score { get; set; }
+    }
+
+    private sealed class CreateRatingRequest
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public decimal Score { get; set; }
+    }
+}

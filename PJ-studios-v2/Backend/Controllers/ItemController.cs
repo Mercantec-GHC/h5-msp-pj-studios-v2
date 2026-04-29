@@ -1,5 +1,6 @@
 ﻿using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Controllers
 {
@@ -7,19 +8,24 @@ namespace Backend.Controllers
     [Route("api/[controller]")]
     public class ItemController : ControllerBase
     {
-        // Simpel midlertidig liste for at gemme i hukommelsen (skiftes ud med database senere)
-        private static readonly List<ItemModel> _items = new();
+        private readonly AppDbContext _context;
+
+        public ItemController(AppDbContext context)
+        {
+            _context = context;
+        }
 
         [HttpGet]
-        public IActionResult GetAllItems()
+        public async Task<IActionResult> GetAllItems()
         {
-            return Ok(_items);
+            var items = await _context.Items.ToListAsync();
+            return Ok(items);
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetItem(string id)
+        public async Task<IActionResult> GetItem(string id)
         {
-            var item = _items.FirstOrDefault(i => i.Id == id);
+            var item = await _context.Items.FirstOrDefaultAsync(i => i.Id == id);
             if (item == null)
             {
                 return NotFound("Item blev ikke fundet.");
@@ -28,15 +34,15 @@ namespace Backend.Controllers
         }
 
         [HttpPost]
-        public IActionResult AddItem([FromBody] ItemModel item)
+        public async Task<IActionResult> AddItem([FromBody] ItemModel item)
         {
-            // Opret et unikt ID, hvis det ikke allerede er sat
             if (string.IsNullOrWhiteSpace(item.Id))
             {
                 item.Id = Guid.NewGuid().ToString();
             }
 
-            _items.Add(item);
+            _context.Items.Add(item);
+            await _context.SaveChangesAsync();
 
             return Ok(item);
         }
