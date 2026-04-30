@@ -128,6 +128,8 @@ namespace Backend.Migrations
             modelBuilder.Entity("Backend.Models.ItemModel", b =>
                 {
                     b.Navigation("Ratings");
+                });
+
             modelBuilder.Entity("Backend.Models.RefreshToken", b =>
                 {
                     b.HasOne("Backend.Models.User", "User")
