@@ -1,0 +1,171 @@
+@page "/users/{UserId}"
+@using System.Net
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Brugerprofil</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="mb-1">Brugerprofil</h1>
+        <p class="text-muted mb-0">Se hvad brugeren har ratet, og søg i deres ratings.</p>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="GoBack">Tilbage til brugere</button>
+</div>
+
+@if (_isLoading)
+{
+    <p><em>Loader profil...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_user is not null)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 mb-1">@_user.Username</h2>
+            <p class="text-muted mb-0">@_user.Email</p>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="searchRatings">Søg efter rated ting</label>
+        <input id="searchRatings" class="form-control" placeholder="Skriv navn på item" @bind="_ratingSearchTerm" @bind:event="oninput" />
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">Brugerens ratings</h2>
+        <span class="text-muted">@RatingsFilteredBySearch.Count rating(s)</span>
+    </div>
+
+    @if (RatingsFilteredBySearch.Count == 0)
+    {
+        <div class="alert alert-info" role="alert">Ingen ratings matcher din søgning.</div>
+    }
+    else
+    {
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Billede</th>
+                    <th>Item</th>
+                    <th>Rating</th>
+                    <th>Beskrivelse</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rating in RatingsFilteredBySearch)
+                {
+                    <tr>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(rating.ItemImageUrl))
+                            {
+                                <img src="@rating.ItemImageUrl" alt="@rating.ItemName" style="width: 72px; height: 72px; object-fit: cover; border-radius: 8px;" />
+                            }
+                        </td>
+                        <td>@rating.ItemName</td>
+                        <td>@rating.Score.ToString("0.0")</td>
+                        <td>@GetRatingDescription(rating.Score)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = string.Empty;
+
+    private bool _isLoading = true;
+    private string _errorMessage = string.Empty;
+    private string _ratingSearchTerm = string.Empty;
+    private UserProfileDto? _user;
+    private List<UserRatingDto> _ratings = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        _user = null;
+
+        try
+        {
+            var userResponse = await Http.GetAsync($"/api/auth/users/{UserId}");
+
+            if (userResponse.StatusCode == HttpStatusCode.NotFound)
+            {
+                _errorMessage = "Brugeren blev ikke fundet.";
+                return;
+            }
+
+            userResponse.EnsureSuccessStatusCode();
+            _user = await userResponse.Content.ReadFromJsonAsync<UserProfileDto>();
+
+            var ratingsResponse = await Http.GetAsync($"/api/ratings/user/{UserId}");
+            if (ratingsResponse.StatusCode == HttpStatusCode.NotFound)
+            {
+                _ratings = new List<UserRatingDto>();
+                return;
+            }
+
+            ratingsResponse.EnsureSuccessStatusCode();
+            _ratings = await ratingsResponse.Content.ReadFromJsonAsync<List<UserRatingDto>>() ?? new List<UserRatingDto>();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke hente brugerprofil: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/users");
+    }
+
+    private List<UserRatingDto> RatingsFilteredBySearch =>
+        string.IsNullOrWhiteSpace(_ratingSearchTerm)
+            ? _ratings
+            : _ratings.Where(rating =>
+                    rating.ItemName.Contains(_ratingSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    rating.Username.Contains(_ratingSearchTerm, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+    private static string GetRatingDescription(decimal score)
+    {
+        return score switch
+        {
+            >= 9 => "Top rating",
+            >= 7 => "Meget positiv",
+            >= 5 => "Middelhøj",
+            _ => "Lav rating"
+        };
+    }
+
+    private sealed class UserProfileDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    private sealed class UserRatingDto
+    {
+        public int Id { get; set; }
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string ItemImageUrl { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public decimal Score { get; set; }
+    }
+}

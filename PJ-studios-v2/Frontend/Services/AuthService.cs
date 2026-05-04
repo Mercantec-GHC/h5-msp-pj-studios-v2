@@ -12,6 +12,8 @@ namespace Frontend.Services
         private readonly HttpClient _httpClient;
         private readonly IJSRuntime _jsRuntime;
 
+        public event Action? AuthStateChanged;
+
         public AuthService(HttpClient httpClient, IJSRuntime jsRuntime)
         {
             _httpClient = httpClient;
@@ -93,6 +95,7 @@ namespace Frontend.Services
         public async Task SaveTokenAsync(string token)
         {
             await _jsRuntime.InvokeVoidAsync("localStorage.setItem", TokenStorageKey, token);
+            AuthStateChanged?.Invoke();
         }
 
         public async Task<string?> GetTokenAsync()
@@ -104,6 +107,7 @@ namespace Frontend.Services
         {
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", TokenStorageKey);
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", UserIdStorageKey);
+            AuthStateChanged?.Invoke();
         }
 
         public async Task SaveUserIdFromTokenAsync(string token)

@@ -1,0 +1,101 @@
+@page "/users"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Brugere</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="mb-1">Brugere</h1>
+        <p class="text-muted mb-0">Søg efter andre brugere og klik ind på deres profil.</p>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label" for="searchUsers">Søg efter bruger</label>
+    <input id="searchUsers" class="form-control" placeholder="Skriv navn eller email" @bind="_searchTerm" @bind:event="oninput" />
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p><em>Loader brugere...</em></p>
+}
+else if (!FilteredUsers.Any())
+{
+    <div class="alert alert-info" role="alert">Ingen brugere matcher din søgning.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Bruger</th>
+                <th>Email</th>
+                <th>Profil</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in FilteredUsers)
+            {
+                <tr style="cursor: pointer;" @onclick="() => OpenProfile(user.Id)">
+                    <td>
+                        <div class="fw-semibold">@user.Username</div>
+                        <small class="text-muted">Klik for at se profil og ratings</small>
+                    </td>
+                    <td>@user.Email</td>
+                    <td>›</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _errorMessage = string.Empty;
+    private string _searchTerm = string.Empty;
+    private List<UserSummaryDto> _users = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserSummaryDto>>("/api/auth/users") ?? new List<UserSummaryDto>();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke hente brugere: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private List<UserSummaryDto> FilteredUsers =>
+        string.IsNullOrWhiteSpace(_searchTerm)
+            ? _users
+            : _users.Where(user =>
+                    user.Username.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    user.Email.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+    private void OpenProfile(string userId)
+    {
+        NavigationManager.NavigateTo($"/users/{userId}");
+    }
+
+    private sealed class UserSummaryDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+}

@@ -17,6 +17,23 @@ namespace Backend.Models
         public string Email { get; set; }
     }
 
+    public class UserSummaryDTO
+    {
+        public string Id { get; set; }
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class UserProfileDTO
+    {
+        public string Id { get; set; }
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+
     public class RegisterUserDTO
     {
         [Required(ErrorMessage = "Username is required.")]
