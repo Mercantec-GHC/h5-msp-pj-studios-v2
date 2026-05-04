@@ -7,7 +7,8 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://localhost:7293") });
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://h5-msp-pj-studios-v2.onrender.com") });
 builder.Services.AddScoped<AuthService>();
 
 await builder.Build().RunAsync();
+

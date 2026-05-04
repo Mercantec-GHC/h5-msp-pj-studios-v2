@@ -26,17 +26,58 @@ namespace Backend.Controllers
             _configuration = configuration;
         }
 
-        [HttpGet("ListOfAllUsers")] // For demo purposes only, not recommended for production
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        [HttpGet("users")]
+        public async Task<ActionResult<IEnumerable<UserSummaryDTO>>> GetUsers([FromQuery] string? search = null)
         {
             try
             {
-                return await _context.Users.ToListAsync();
+                var query = _context.Users.AsNoTracking();
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var normalizedSearch = search.Trim().ToLower();
+                    query = query.Where(user =>
+                        user.Username.ToLower().Contains(normalizedSearch) ||
+                        user.Email.ToLower().Contains(normalizedSearch));
+                }
+
+                var users = await query
+                    .OrderBy(user => user.Username)
+                    .Select(user => new UserSummaryDTO
+                    {
+                        Id = user.ID,
+                        Username = user.Username,
+                        Email = user.Email,
+                        CreatedAt = user.CreatedAt
+                    })
+                    .ToListAsync();
+
+                return Ok(users);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Database error", error = ex.InnerException?.Message ?? ex.Message });
             }
+        }
+
+        [HttpGet("users/{id}")]
+        public async Task<ActionResult<UserProfileDTO>> GetUserById(string id)
+        {
+            var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(user => user.ID == id);
+
+            if (user == null)
+            {
+                return NotFound("User not found");
+            }
+
+            return Ok(new UserProfileDTO
+            {
+                Id = user.ID,
+                Username = user.Username,
+                Email = user.Email,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            });
         }
 
         [HttpGet("me")]

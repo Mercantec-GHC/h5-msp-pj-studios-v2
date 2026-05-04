@@ -73,12 +73,16 @@ namespace Backend.Controllers
         private IQueryable<RatingResponseDto> BuildRatingsResponseQuery()
         {
             return from rating in _context.Ratings
+                   join item in _context.Items on rating.ItemId equals item.Id into itemGroup
+                   from item in itemGroup.DefaultIfEmpty()
                    join user in _context.Users on rating.UserId equals user.ID into userGroup
                    from user in userGroup.DefaultIfEmpty()
                    select new RatingResponseDto
                    {
                        Id = rating.Id,
                        ItemId = rating.ItemId,
+                       ItemName = item != null ? item.Name : "Ukendt item",
+                       ItemImageUrl = item != null ? item.ImageUrl : string.Empty,
                        UserId = rating.UserId,
                        Username = user != null ? user.Username : "Ukendt bruger",
                        Score = rating.Score
@@ -92,10 +96,17 @@ namespace Backend.Controllers
                 .Select(u => u.Username)
                 .SingleOrDefaultAsync();
 
+            var item = await _context.Items
+                .Where(i => i.Id == rating.ItemId)
+                .Select(i => new { i.Name, i.ImageUrl })
+                .SingleOrDefaultAsync();
+
             return new RatingResponseDto
             {
                 Id = rating.Id,
                 ItemId = rating.ItemId,
+                ItemName = item?.Name ?? "Ukendt item",
+                ItemImageUrl = item?.ImageUrl ?? string.Empty,
                 UserId = rating.UserId,
                 Username = userName ?? "Ukendt bruger",
                 Score = rating.Score
@@ -106,6 +117,8 @@ namespace Backend.Controllers
         {
             public int Id { get; set; }
             public string ItemId { get; set; } = string.Empty;
+            public string ItemName { get; set; } = string.Empty;
+            public string ItemImageUrl { get; set; } = string.Empty;
             public string UserId { get; set; } = string.Empty;
             public string Username { get; set; } = string.Empty;
             public decimal Score { get; set; }
