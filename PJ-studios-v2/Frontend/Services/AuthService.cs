@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text;
 using Microsoft.JSInterop;
@@ -129,6 +130,15 @@ namespace Frontend.Services
         public async Task<string?> GetUserIdAsync()
         {
             return await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", UserIdStorageKey);
+        }
+
+        public async Task ApplyAuthorizationHeaderAsync(HttpRequestMessage request)
+        {
+            var token = await GetTokenAsync();
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
         }
 
         private static string? ExtractUserIdFromJwt(string token)

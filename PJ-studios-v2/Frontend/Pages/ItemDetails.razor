@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
 
 <PageTitle>Item detaljer</PageTitle>
 
@@ -32,6 +33,42 @@ else
         <div class="col-md-6">
             <h1>@_item.Name</h1>
             <p class="text-muted">@_item.Description</p>
+
+            @if (_canEditItem)
+            {
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="ToggleEditMode">
+                        @(_isEditing ? "Annuller" : "Rediger")
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" @onclick="DeleteItemAsync" disabled="@_isDeletingItem">
+                        @(_isDeletingItem ? "Sletter..." : "Slet")
+                    </button>
+                </div>
+            }
+
+            @if (_isEditing)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Rediger item</h5>
+                        <div class="mb-3">
+                            <label class="form-label" for="editName">Navn</label>
+                            <input id="editName" class="form-control" @bind="_editName" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editDescription">Beskrivelse</label>
+                            <textarea id="editDescription" class="form-control" rows="4" @bind="_editDescription"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editImageUrl">Billede URL</label>
+                            <input id="editImageUrl" class="form-control" @bind="_editImageUrl" />
+                        </div>
+                        <button class="btn btn-primary" @onclick="SaveItemAsync" disabled="@_isSavingItem">
+                            @(_isSavingItem ? "Gemmer..." : "Gem ændringer")
+                        </button>
+                    </div>
+                </div>
+            }
 
             @if (!string.IsNullOrWhiteSpace(_errorMessage))
             {
@@ -94,6 +131,13 @@ else
     private decimal _ratingScore = 5.0m;
     private bool _isLoading = true;
     private bool _isSubmittingRating;
+    private bool _isEditing;
+    private bool _isSavingItem;
+    private bool _isDeletingItem;
+    private string _currentUserId = string.Empty;
+    private string _editName = string.Empty;
+    private string _editDescription = string.Empty;
+    private string _editImageUrl = string.Empty;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
     private List<RatingDto> _allRatings = new();
@@ -115,6 +159,7 @@ else
         try
         {
             _item = await Http.GetFromJsonAsync<ItemDto>($"/api/item/{ItemId}");
+            _currentUserId = await AuthService.GetUserIdAsync() ?? string.Empty;
 
             if (_item != null)
             {
@@ -133,6 +178,13 @@ else
                     {
                         _ratingScore = existingRating.Score;
                     }
+                }
+
+                if (_isEditing)
+                {
+                    _editName = _item.Name;
+                    _editDescription = _item.Description;
+                    _editImageUrl = _item.ImageUrl;
                 }
             }
         }
@@ -188,9 +240,139 @@ else
         }
     }
 
+    private bool _canEditItem => _item != null && !string.IsNullOrWhiteSpace(_currentUserId) && string.Equals(_item.UserId, _currentUserId, StringComparison.Ordinal);
+
+    private void ToggleEditMode()
+    {
+        if (!_canEditItem)
+        {
+            return;
+        }
+
+        _isEditing = !_isEditing;
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+
+        if (_isEditing && _item != null)
+        {
+            _editName = _item.Name;
+            _editDescription = _item.Description;
+            _editImageUrl = _item.ImageUrl;
+        }
+    }
+
+    private async Task SaveItemAsync()
+    {
+        if (_item == null)
+        {
+            return;
+        }
+
+        var token = await AuthService.GetTokenAsync();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _errorMessage = "Du skal være logget ind for at redigere et item.";
+            return;
+        }
+
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isSavingItem = true;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Put, $"/api/item/{ItemId}")
+            {
+                Content = JsonContent.Create(new UpdateItemRequest
+                {
+                    Name = _editName.Trim(),
+                    Description = _editDescription.Trim(),
+                    ImageUrl = _editImageUrl.Trim()
+                })
+            };
+
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke gemme ændringer: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            _successMessage = "Item opdateret.";
+            _isEditing = false;
+            await LoadItemAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fejl: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingItem = false;
+        }
+    }
+
+    private async Task DeleteItemAsync()
+    {
+        if (_item == null)
+        {
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Vil du slette '{_item.Name}'?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var token = await AuthService.GetTokenAsync();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _errorMessage = "Du skal være logget ind for at slette et item.";
+            return;
+        }
+
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isDeletingItem = true;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/item/{ItemId}");
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke slette item: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            NavigationManager.NavigateTo("/items");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fejl: {ex.Message}";
+        }
+        finally
+        {
+            _isDeletingItem = false;
+        }
+    }
+
     private sealed class ItemDto
     {
         public string Id { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+    }
+
+    private sealed class UpdateItemRequest
+    {
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;

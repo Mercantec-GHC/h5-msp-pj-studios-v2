@@ -2,6 +2,7 @@
 @using System.Net.Http.Json
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject Frontend.Services.AuthService AuthService
 
 <PageTitle>Items</PageTitle>
 
@@ -153,6 +154,13 @@ else
         _errorMessage = string.Empty;
         _successMessage = string.Empty;
 
+        var token = await AuthService.GetTokenAsync();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _errorMessage = "Du skal være logget ind for at oprette et item.";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_newItemName))
         {
             _errorMessage = "Navn er paakraevet.";
@@ -169,7 +177,13 @@ else
                 ImageUrl = _newItemImageUrl
             };
 
-            var response = await Http.PostAsJsonAsync("/api/item", request);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/item")
+            {
+                Content = JsonContent.Create(request)
+            };
+            await AuthService.ApplyAuthorizationHeaderAsync(httpRequest);
+
+            var response = await Http.SendAsync(httpRequest);
             if (!response.IsSuccessStatusCode)
             {
                 _errorMessage = $"Kunne ikke oprette item: {(int)response.StatusCode} {response.StatusCode}";

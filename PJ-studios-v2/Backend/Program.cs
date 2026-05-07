@@ -87,6 +87,7 @@ using (var scope = app.Services.CreateScope())
     await dbContext.Database.ExecuteSqlRawAsync(@"
         CREATE TABLE IF NOT EXISTS ""Items"" (
             ""Id"" text PRIMARY KEY,
+            ""UserId"" text NOT NULL DEFAULT '',
             ""Name"" text NOT NULL,
             ""Description"" text NOT NULL,
             ""ImageUrl"" text NOT NULL DEFAULT ''
@@ -95,6 +96,7 @@ using (var scope = app.Services.CreateScope())
 
     await dbContext.Database.ExecuteSqlRawAsync(@"
         ALTER TABLE ""Items""
+        ADD COLUMN IF NOT EXISTS ""UserId"" text NOT NULL DEFAULT '',
         ADD COLUMN IF NOT EXISTS ""ImageUrl"" text NOT NULL DEFAULT '';
     ");
 
