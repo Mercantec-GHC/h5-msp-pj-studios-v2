@@ -63,6 +63,17 @@ else
                             <label class="form-label" for="editImageUrl">Billede URL</label>
                             <input id="editImageUrl" class="form-control" @bind="_editImageUrl" />
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editImageFile">Eller vælg en billedfil</label>
+                            <InputFile id="editImageFile" class="form-control" OnChange="OnEditFileSelectedAsync" accept="image/*" />
+                            <div class="form-text">Understøtter billeder op til 2 MB.</div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(_editImageUrl))
+                        {
+                            <div class="mb-3">
+                                <img src="@_editImageUrl" alt="Forhaandsvisning" style="max-width: 220px; max-height: 220px; border-radius: 8px;" />
+                            </div>
+                        }
                         <button class="btn btn-primary" @onclick="SaveItemAsync" disabled="@_isSavingItem">
                             @(_isSavingItem ? "Gemmer..." : "Gem ændringer")
                         </button>
@@ -311,6 +322,41 @@ else
         finally
         {
             _isSavingItem = false;
+        }
+    }
+
+    private async Task OnEditFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        _errorMessage = string.Empty;
+
+        var file = e.File;
+        if (file == null)
+        {
+            _editImageUrl = string.Empty;
+            return;
+        }
+
+        const long maxFileSize = 2 * 1024 * 1024;
+        if (file.Size > maxFileSize)
+        {
+            _editImageUrl = string.Empty;
+            _errorMessage = "Billedet er for stort. Maks 2 MB.";
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+
+            var base64 = Convert.ToBase64String(ms.ToArray());
+            _editImageUrl = $"data:{file.ContentType};base64,{base64}";
+        }
+        catch (Exception ex)
+        {
+            _editImageUrl = string.Empty;
+            _errorMessage = $"Kunne ikke læse billedet: {ex.Message}";
         }
     }
 
