@@ -1,0 +1,317 @@
+@page "/my-profile"
+@using System.ComponentModel.DataAnnotations
+@using System.Net.Http.Json
+@using Frontend.Services
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
+
+<PageTitle>Min bruger</PageTitle>
+
+@if (_isLoading)
+{
+    <p><em>Loader din bruger...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_user is not null)
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-1">Min bruger</h1>
+            <p class="text-muted mb-0">Rediger dine oplysninger eller slet din konto.</p>
+        </div>
+        <a href="/items" class="btn btn-outline-secondary">Tilbage til items</a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success" role="alert">@_successMessage</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Profiloplysninger</h2>
+
+                    <EditForm Model="_profileModel" OnValidSubmit="SaveProfileAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger mb-3" />
+
+                        <div class="mb-3">
+                            <label class="form-label" for="username">Brugernavn</label>
+                            <InputText id="username" class="form-control" @bind-Value="_profileModel.Username" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="email">Email</label>
+                            <InputText id="email" class="form-control" @bind-Value="_profileModel.Email" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" disabled="@_isSavingProfile">
+                            @(_isSavingProfile ? "Gemmer..." : "Gem profil")
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Skift kodeord</h2>
+
+                    <EditForm Model="_passwordModel" OnValidSubmit="ChangePasswordAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger mb-3" />
+
+                        <div class="mb-3">
+                            <label class="form-label" for="newPassword">Nyt kodeord</label>
+                            <InputText id="newPassword" type="password" class="form-control" @bind-Value="_passwordModel.Password" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="confirmPassword">Bekræft kodeord</label>
+                            <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="_passwordModel.PasswordConfirm" />
+                        </div>
+
+                        <button type="submit" class="btn btn-outline-primary" disabled="@_isSavingPassword">
+                            @(_isSavingPassword ? "Opdaterer..." : "Skift kodeord")
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h2 class="h5 text-danger mb-2">Slet konto</h2>
+                    <p class="text-muted mb-3">Dette fjerner din bruger, dine items, dine ratings og dine login-tokens.</p>
+                    <button class="btn btn-danger" @onclick="DeleteAccountAsync" disabled="@_isDeletingAccount">
+                        @(_isDeletingAccount ? "Sletter..." : "Slet min konto")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSavingProfile;
+    private bool _isSavingPassword;
+    private bool _isDeletingAccount;
+    private string _errorMessage = string.Empty;
+    private string _successMessage = string.Empty;
+    private UserProfileDto? _user;
+    private readonly UpdateProfileModel _profileModel = new();
+    private readonly UpdatePasswordModel _passwordModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await AuthService.GetTokenAsync();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        await LoadUserAsync();
+    }
+
+    private async Task LoadUserAsync()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke hente bruger: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            _user = await response.Content.ReadFromJsonAsync<UserProfileDto>();
+            if (_user != null)
+            {
+                _profileModel.Username = _user.Username;
+                _profileModel.Email = _user.Email;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke hente bruger: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isSavingProfile = true;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/updateUser")
+            {
+                Content = JsonContent.Create(new UpdateProfileRequest
+                {
+                    Username = _profileModel.Username.Trim(),
+                    Email = _profileModel.Email.Trim()
+                })
+            };
+
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke opdatere profil: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            _successMessage = "Profil opdateret.";
+            await LoadUserAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke opdatere profil: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingProfile = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isSavingPassword = true;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Put, "/api/auth/updatePassword")
+            {
+                Content = JsonContent.Create(new UpdatePasswordRequest
+                {
+                    Password = _passwordModel.Password,
+                    PasswordConfirm = _passwordModel.PasswordConfirm
+                })
+            };
+
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke opdatere kodeord: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            _successMessage = "Kodeord opdateret.";
+            _passwordModel.Password = string.Empty;
+            _passwordModel.PasswordConfirm = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke opdatere kodeord: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingPassword = false;
+        }
+    }
+
+    private async Task DeleteAccountAsync()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Er du sikker på, at du vil slette din konto?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _isDeletingAccount = true;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, "/api/auth/deleteUser");
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke slette konto: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            await AuthService.ClearTokenAsync();
+            NavigationManager.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke slette konto: {ex.Message}";
+        }
+        finally
+        {
+            _isDeletingAccount = false;
+        }
+    }
+
+    private sealed class UserProfileDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    private sealed class UpdateProfileModel
+    {
+        [Required(ErrorMessage = "Brugernavn er påkrævet.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email er påkrævet.")]
+        [EmailAddress(ErrorMessage = "Indtast en gyldig email.")]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    private sealed class UpdatePasswordModel
+    {
+        [Required(ErrorMessage = "Kodeord er påkrævet.")]
+        [MinLength(8, ErrorMessage = "Kodeord skal mindst være 8 tegn.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Bekræft kodeord er påkrævet.")]
+        [Compare(nameof(Password), ErrorMessage = "Kodeordene matcher ikke.")]
+        public string PasswordConfirm { get; set; } = string.Empty;
+    }
+
+    private sealed class UpdateProfileRequest
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+
+    private sealed class UpdatePasswordRequest
+    {
+        public string Password { get; set; } = string.Empty;
+        public string PasswordConfirm { get; set; } = string.Empty;
+    }
+}

@@ -1,4 +1,10 @@
-﻿<nav class="navbar">
+﻿@using System.Net.Http.Json
+@using Frontend.Services
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<nav class="navbar">
     <div class="nav-container">
         <button class="hamburger @(isOpen ? "active" : "")" @onclick="ToggleNavMenu" title="Navigation menu">
             <span></span>
@@ -24,7 +30,10 @@
         <div class="nav-auth">
             @if (isLoggedIn)
             {
-                <span class="user-greeting">@userEmail</span>
+                <NavLink href="my-profile" class="nav-link nav-link-profile" @onclick="CloseMenu">
+                    Min bruger
+                </NavLink>
+                <span class="user-greeting">@userDisplay</span>
                 <button class="btn-logout" @onclick="Logout">Logout</button>
             }
             else
@@ -40,13 +49,8 @@
 @code {
     private bool isOpen = false;
     private bool isLoggedIn = false;
-    private string userEmail = string.Empty;
+    private string userDisplay = string.Empty;
     
-    [Inject]
-    private AuthService AuthService { get; set; } = null!;
-    
-    [Inject]
-    private NavigationManager NavigationManager { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -63,19 +67,32 @@
     {
         var token = await AuthService.GetTokenAsync();
         isLoggedIn = !string.IsNullOrWhiteSpace(token);
-        
-        if (isLoggedIn && token != null)
+        userDisplay = string.Empty;
+
+        if (!isLoggedIn || token == null)
         {
-            var email = ExtractEmailFromJwt(token);
-            if (!string.IsNullOrWhiteSpace(email))
+            return;
+        }
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
             {
-                userEmail = email;
-            }
-            else
-            {
-                userEmail = "Logget ind";
+                var profile = await response.Content.ReadFromJsonAsync<UserProfileDto>();
+                userDisplay = profile?.Username ?? profile?.Email ?? "Logget ind";
+                return;
             }
         }
+        catch
+        {
+            // Fall back to token parsing if the profile endpoint is unavailable.
+        }
+
+        userDisplay = ExtractEmailFromJwt(token) ?? "Logget ind";
     }
 
     private static string? ExtractEmailFromJwt(string token)
@@ -120,7 +137,7 @@
     {
         await AuthService.ClearTokenAsync();
         isLoggedIn = false;
-        userEmail = string.Empty;
+        userDisplay = string.Empty;
         CloseMenu();
         NavigationManager.NavigateTo("/");
     }
@@ -129,5 +146,14 @@
     {
         await CheckAuthStatus();
         await InvokeAsync(StateHasChanged);
+    }
+
+    private sealed class UserProfileDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }
