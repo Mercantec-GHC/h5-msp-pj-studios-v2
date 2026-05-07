@@ -184,7 +184,12 @@ else if (_user is not null)
             }
 
             _successMessage = "Profil opdateret.";
+            var successMsg = _successMessage;
             await LoadUserAsync();
+            _successMessage = successMsg;
+            await Task.Delay(3000);
+            _successMessage = string.Empty;
+            StateHasChanged();
         }
         catch (Exception ex)
         {
