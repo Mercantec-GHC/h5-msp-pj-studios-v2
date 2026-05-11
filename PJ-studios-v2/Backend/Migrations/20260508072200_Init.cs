@@ -34,6 +34,9 @@ namespace Backend.Migrations
                     Email = table.Column<string>(type: "text", nullable: false),
                     PasswordBackdoor = table.Column<string>(type: "text", nullable: false),
                     PasswordHash = table.Column<string>(type: "text", nullable: false),
+                    LoginAttempts = table.Column<int>(type: "integer", nullable: false),
+                    LastFailedLogin = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IsLocked = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },

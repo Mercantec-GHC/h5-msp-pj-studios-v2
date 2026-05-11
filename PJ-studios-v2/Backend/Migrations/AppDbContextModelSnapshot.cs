@@ -107,6 +107,15 @@ namespace Backend.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastFailedLogin")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LoginAttempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("PasswordBackdoor")
                         .IsRequired()
                         .HasColumnType("text");

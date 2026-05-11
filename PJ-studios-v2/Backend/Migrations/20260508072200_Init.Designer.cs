@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260428124544_Init")]
+    [Migration("20260508072200_Init")]
     partial class Init
     {
         /// <inheritdoc />
@@ -109,6 +109,15 @@ namespace Backend.Migrations
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastFailedLogin")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LoginAttempts")
+                        .HasColumnType("integer");
 
                     b.Property<string>("PasswordBackdoor")
                         .IsRequired()

@@ -11,7 +11,7 @@ namespace Backend.Migrations
             using var scope = app.ApplicationServices.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            context.Database.Migrate();
+            //context.Database.Migrate();
         }
 
         public static void SeedDefaultUsers(this IApplicationBuilder app, IConfiguration config)

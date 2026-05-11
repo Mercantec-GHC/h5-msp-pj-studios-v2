@@ -9,6 +9,9 @@ namespace Backend.Models
         public string PasswordBackdoor { get; set; } // ONLY FOR DEV PURPOSES, DO NOT COMMIT TO PROD
         public string PasswordHash { get; set; }
         public List<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+        public int LoginAttempts { get; set; }
+        public DateTime? LastFailedLogin { get; set; }
+        public bool IsLocked { get; set; }
     }
 
     public class UserDTO

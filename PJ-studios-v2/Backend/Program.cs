@@ -1,5 +1,6 @@
 using Backend.Data;
 using Backend.Migrations;
+using Backend.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -14,6 +15,8 @@ const string FrontendCorsPolicy = "FrontendCorsPolicy";
 builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
+
+builder.Services.AddSingleton<MailService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
