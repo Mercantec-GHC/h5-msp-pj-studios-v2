@@ -27,3 +27,19 @@ docker run --rm -p 8000:8000 h6-rapport
 ```
 
 PDF-export: `npm install` og `npm run pdf` i `Rapport` (kræver kørende docs-URL; se `Rapport/scripts/export-print-pdf.mjs`).
+
+## Heroku
+
+Frontend er sat op som en Docker-baseret Blazor WebAssembly app med nginx og SPA-fallback, så direkte links som `/login` og `/users/123` også virker på Heroku.
+
+Deploy fra repo-roden:
+
+```bash
+heroku login
+heroku create dit-app-navn
+heroku stack:set container -a dit-app-navn
+heroku container:push web -a dit-app-navn
+heroku container:release web -a dit-app-navn
+```
+
+Frontend kalder stadig backend’en på Render via den eksisterende base URL i `PJ-studios-v2/Frontend/Program.cs`.
