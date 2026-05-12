@@ -1,0 +1,53 @@
+@using Frontend.Services
+@inject PictureService PictureService
+
+<div class="mb-4">
+    @if (_isLoading)
+    {
+        <div>Henter dagens billede...</div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-warning">Kunne ikke hente billede: @_error</div>
+    }
+    else if (_picture is not null)
+    {
+        <div class="card">
+            @if (_picture.MediaType == "image")
+            {
+                <img src="@_picture.Url" class="card-img-top img-fluid" alt="@_picture.Title" />
+            }
+            <div class="card-body">
+                <h5 class="card-title">@_picture.Title</h5>
+                <p class="card-text small text-muted">Billede fra ekstern daglig API</p>
+                <p class="card-text">@_picture.Explanation</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private PictureOfDayDto? _picture;
+    private bool _isLoading = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _picture = await PictureService.GetPictureOfDayAsync();
+            if (_picture == null)
+            {
+                _error = "Intet billede tilgængeligt";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
