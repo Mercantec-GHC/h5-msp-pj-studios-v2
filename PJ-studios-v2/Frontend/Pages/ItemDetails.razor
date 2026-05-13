@@ -32,6 +32,15 @@ else
         </div>
         <div class="col-md-6">
             <h1>@_item.Name</h1>
+            @if (_item.Tags != null && _item.Tags.Any())
+            {
+                <div class="mb-2">
+                    @foreach (var tag in _item.Tags)
+                    {
+                        <span class="badge bg-secondary me-1">@tag</span>
+                    }
+                </div>
+            }
             <p class="text-muted">@_item.Description</p>
 
             @if (_canEditItem)
@@ -58,6 +67,10 @@ else
                         <div class="mb-3">
                             <label class="form-label" for="editDescription">Beskrivelse</label>
                             <textarea id="editDescription" class="form-control" rows="4" @bind="_editDescription"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editTags">Tags (komma-separeret)</label>
+                            <input id="editTags" class="form-control" @bind="_editTags" placeholder="f.eks. monster, sejt" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="editImageUrl">Billede URL</label>
@@ -149,6 +162,7 @@ else
     private string _editName = string.Empty;
     private string _editDescription = string.Empty;
     private string _editImageUrl = string.Empty;
+    private string _editTags = string.Empty;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
     private List<RatingDto> _allRatings = new();
@@ -269,6 +283,7 @@ else
             _editName = _item.Name;
             _editDescription = _item.Description;
             _editImageUrl = _item.ImageUrl;
+            _editTags = _item.Tags != null ? string.Join(", ", _item.Tags) : string.Empty;
         }
     }
 
@@ -298,7 +313,8 @@ else
                 {
                     Name = _editName.Trim(),
                     Description = _editDescription.Trim(),
-                    ImageUrl = _editImageUrl.Trim()
+                    ImageUrl = _editImageUrl.Trim(),
+                    Tags = _editTags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
                 })
             };
 
@@ -415,6 +431,7 @@ else
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
     }
 
     private sealed class UpdateItemRequest
@@ -422,6 +439,7 @@ else
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
     }
 
     private sealed class RatingDto

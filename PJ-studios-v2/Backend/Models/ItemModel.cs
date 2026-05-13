@@ -7,6 +7,7 @@
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
 
         // Et item kan have mange ratings
         public List<RatingsModel> Ratings { get; set; } = new();

@@ -83,6 +83,7 @@ namespace Backend.Controllers
             item.Name = updatedItem.Name.Trim();
             item.Description = updatedItem.Description.Trim();
             item.ImageUrl = updatedItem.ImageUrl?.Trim() ?? string.Empty;
+            item.Tags = updatedItem.Tags ?? new List<string>();
 
             await _context.SaveChangesAsync();
 

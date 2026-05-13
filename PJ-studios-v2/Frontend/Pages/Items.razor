@@ -30,6 +30,10 @@
                 <textarea id="itemDescription" class="form-control" rows="3" @bind="_newItemDescription"></textarea>
             </div>
             <div class="mb-3">
+                <label class="form-label" for="itemTags">Tags (komma-separeret)</label>
+                <input id="itemTags" class="form-control" @bind="_newItemTags" placeholder="f.eks. monster, sejt" />
+            </div>
+            <div class="mb-3">
                 <label class="form-label" for="itemImage">Billede</label>
                 <InputFile id="itemImage" class="form-control" OnChange="OnFileSelectedAsync" accept="image/*" />
                 <div class="form-text">Understøtter billeder op til 2 MB.</div>
@@ -106,6 +110,7 @@ else
     private string _searchTerm = string.Empty;
     private string _newItemName = string.Empty;
     private string _newItemDescription = string.Empty;
+    private string _newItemTags = string.Empty;
     private string _newItemImageUrl = string.Empty;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
@@ -174,7 +179,8 @@ else
             {
                 Name = _newItemName.Trim(),
                 Description = _newItemDescription.Trim(),
-                ImageUrl = _newItemImageUrl
+                ImageUrl = _newItemImageUrl,
+                Tags = _newItemTags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
             };
 
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/item")
@@ -200,6 +206,7 @@ else
             _newItemName = string.Empty;
             _newItemDescription = string.Empty;
             _newItemImageUrl = string.Empty;
+            _newItemTags = string.Empty;
             _showCreateForm = false;
             _successMessage = "Item oprettet.";
         }
@@ -254,6 +261,7 @@ else
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
     }
 
     private sealed class CreateItemRequest
@@ -261,6 +269,7 @@ else
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        public List<string> Tags { get; set; } = new();
     }
 
     private void GoToItemDetails(string itemId)
