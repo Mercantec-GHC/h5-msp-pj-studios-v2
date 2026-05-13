@@ -1,4 +1,7 @@
-﻿using Backend.Models;
+﻿using Azure.Core;
+using Backend.Data;
+using Backend.Models;
+using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +12,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Backend.Data;
 
 namespace Backend.Controllers
 {
@@ -19,11 +21,13 @@ namespace Backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly MailService _mailService;
 
-        public AuthController(AppDbContext context, IConfiguration configuration)
+        public AuthController(AppDbContext context, IConfiguration configuration, MailService mailService)
         {
             _context = context;
             _configuration = configuration;
+            _mailService = mailService;
         }
 
         [HttpGet("users")]
@@ -60,6 +64,21 @@ namespace Backend.Controllers
             }
         }
 
+        [HttpGet("test-email")]
+        public async Task<IActionResult> TestEmail([FromServices] MailService mail)
+        {
+            await mail.SendMail(
+                "patricktl2004@gmail.com",
+                "Test Email",
+                "Your SendGrid SMTP setup works!"
+            );
+
+            return Ok("Email sent");
+        }
+
+
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser()
         [HttpGet("users/{id}")]
         public async Task<ActionResult<UserProfileDTO>> GetUserById(string id)
         {
@@ -138,12 +157,50 @@ namespace Backend.Controllers
             }
 
             User user = await _context.Users.SingleOrDefaultAsync(u => u.Email == DTO.Email);
-            if (user == null || !BCrypt.Net.BCrypt.Verify(DTO.Password, user.PasswordHash))
+            if (user == null)
             {
                 return BadRequest("Invalid email or password");
             }
 
+            if (user.IsLocked && user.LastFailedLogin < DateTime.UtcNow.AddMinutes(-15))
+            {
+                user.IsLocked = false;
+                user.LoginAttempts = 0;
+            }
+
+            if (user.IsLocked)
+            {
+                return Unauthorized("Invalid credentials");
+            }
+
+            bool passwordCorrect = BCrypt.Net.BCrypt.Verify(DTO.Password, user.PasswordHash);
+
+            if (!passwordCorrect)
+            {
+                user.LoginAttempts++;
+                user.LastFailedLogin = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.UtcNow.AddHours(2);
+
+                if (user.LoginAttempts >= 4)
+                {
+                    user.IsLocked = true;
+
+                    await _mailService.SendMail(
+                        user.Email,
+                        "Suspicious Login Attempt",
+                        "Someone has attempted to log into your account multiple times. If this wasn't you, please reset your password."
+                    );
+                }
+
+                await _context.SaveChangesAsync();
+                return BadRequest("Invalid credentials");
+            }
+
             var token = GenerateToken(user);
+
+            user.LoginAttempts = 0;
+            user.IsLocked = false;
+            await _context.SaveChangesAsync();
 
             var refreshToken = GenerateRefreshToken();
             refreshToken.UserId = user.ID;
@@ -246,15 +303,21 @@ namespace Backend.Controllers
                 return Unauthorized("User not found.");
             }
 
+            if (userId == null)
+            {
+                return Unauthorized("Missing userId claim.");
+            }
+
+
             bool updated = false;
 
-            if (!string.IsNullOrWhiteSpace(dto.Username))
+            if (!string.IsNullOrWhiteSpace(dto.Username) || dto.Username != "string")
             {
                 user.Username = dto.Username.Trim();
                 updated = true;
             }
 
-            if (!string.IsNullOrWhiteSpace(dto.Email))
+            if (!string.IsNullOrWhiteSpace(dto.Email) || dto.Email != "user@example.com")
             {
                 user.Email = dto.Email.Trim();
                 updated = true;
@@ -266,6 +329,7 @@ namespace Backend.Controllers
             }
 
             user.UpdatedAt = DateTime.UtcNow.AddHours(2);
+
             await _context.SaveChangesAsync();
 
             return Ok("User updated successfully!");
@@ -287,6 +351,11 @@ namespace Backend.Controllers
                 return Unauthorized("User not found.");
             }
 
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+            {
+                return BadRequest("Incorrect password");
+            }
+
             user.PasswordBackdoor = dto.Password;
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
             user.UpdatedAt = DateTime.UtcNow.AddHours(2);
@@ -300,12 +369,17 @@ namespace Backend.Controllers
 
         [Authorize]
         [HttpDelete("deleteUser")]
-        public async Task<IActionResult> DeleteUser()
+        public async Task<IActionResult> DeleteUser(string Password)
         {
             var user = await GetCurrentUserAsync();
             if (user == null)
             {
                 return Unauthorized("User not found");
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
+            {
+                return BadRequest("Incorrect password");
             }
 
             var ownedItemIds = await _context.Items
