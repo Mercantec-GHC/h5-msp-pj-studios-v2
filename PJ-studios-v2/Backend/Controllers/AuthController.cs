@@ -30,12 +30,33 @@ namespace Backend.Controllers
             _mailService = mailService;
         }
 
-        [HttpGet("ListOfAllUsers")] // For demo purposes only, not recommended for production
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        [HttpGet("users")]
+        public async Task<ActionResult<IEnumerable<UserSummaryDTO>>> GetUsers([FromQuery] string? search = null)
         {
             try
             {
-                return await _context.Users.ToListAsync();
+                var query = _context.Users.AsNoTracking();
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var normalizedSearch = search.Trim().ToLower();
+                    query = query.Where(user =>
+                        user.Username.ToLower().Contains(normalizedSearch) ||
+                        user.Email.ToLower().Contains(normalizedSearch));
+                }
+
+                var users = await query
+                    .OrderBy(user => user.Username)
+                    .Select(user => new UserSummaryDTO
+                    {
+                        Id = user.ID,
+                        Username = user.Username,
+                        Email = user.Email,
+                        CreatedAt = user.CreatedAt
+                    })
+                    .ToListAsync();
+
+                return Ok(users);
             }
             catch (Exception ex)
             {
@@ -58,25 +79,44 @@ namespace Backend.Controllers
 
         [HttpGet("me")]
         public async Task<IActionResult> GetCurrentUser()
+        [HttpGet("users/{id}")]
+        public async Task<ActionResult<UserProfileDTO>> GetUserById(string id)
         {
-            string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
-                return BadRequest("User not found");
-            }
-            User? user = await _context.Users.FindAsync(userId);
+            var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(user => user.ID == id);
+
             if (user == null)
             {
-                return BadRequest("User not found");
+                return NotFound("User not found");
             }
 
-            var DTO = new UserDTO
+            return Ok(new UserProfileDTO
             {
+                Id = user.ID,
                 Username = user.Username,
-                Email = user.Email
-            };
+                Email = user.Email,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            });
+        }
 
-            return Ok(DTO);
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            var user = await GetCurrentUserAsync();
+            if (user == null)
+            {
+                return Unauthorized("User not found");
+            }
+
+            return Ok(new UserProfileDTO
+            {
+                Id = user.ID,
+                Username = user.Username,
+                Email = user.Email,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            });
         }
 
         [HttpPost("register")]
@@ -249,20 +289,18 @@ namespace Backend.Controllers
 
 
         [Authorize]
-        [HttpPatch("updateUser")]
-        public async Task<IActionResult> PatchUser(UpdateUserInfoDTO dto)
+        [HttpPost("updateUser")]
+        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserInfoDTO dto)
         {
             if (dto == null)
             {
                 return BadRequest("No data provided.");
             }
 
-            string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-
-            var user = await _context.Users.FindAsync(userId);
+            var user = await GetCurrentUserAsync();
             if (user == null)
             {
-                return NotFound("User not found.");
+                return Unauthorized("User not found.");
             }
 
             if (userId == null)
@@ -275,13 +313,13 @@ namespace Backend.Controllers
 
             if (!string.IsNullOrWhiteSpace(dto.Username) || dto.Username != "string")
             {
-                user.Username = dto.Username;
+                user.Username = dto.Username.Trim();
                 updated = true;
             }
 
             if (!string.IsNullOrWhiteSpace(dto.Email) || dto.Email != "user@example.com")
             {
-                user.Email = dto.Email;
+                user.Email = dto.Email.Trim();
                 updated = true;
             }
 
@@ -307,15 +345,10 @@ namespace Backend.Controllers
                 return BadRequest("No data provided.");
             }
 
-            string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
-                return BadRequest("User not found");
-            }
-            User? user = await _context.Users.FindAsync(userId);
+            var user = await GetCurrentUserAsync();
             if (user == null)
             {
-                return BadRequest("User not found");
+                return Unauthorized("User not found.");
             }
 
             if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
@@ -338,15 +371,10 @@ namespace Backend.Controllers
         [HttpDelete("deleteUser")]
         public async Task<IActionResult> DeleteUser(string Password)
         {
-            string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
-            {
-                return BadRequest("User not found");
-            }
-            User? user = await _context.Users.FindAsync(userId);
+            var user = await GetCurrentUserAsync();
             if (user == null)
             {
-                return BadRequest("User not found");
+                return Unauthorized("User not found");
             }
 
             if (!BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
@@ -354,9 +382,48 @@ namespace Backend.Controllers
                 return BadRequest("Incorrect password");
             }
 
+            var ownedItemIds = await _context.Items
+                .Where(item => item.UserId == user.ID)
+                .Select(item => item.Id)
+                .ToListAsync();
+
+            var relatedRatings = await _context.Ratings
+                .Where(rating => rating.UserId == user.ID || ownedItemIds.Contains(rating.ItemId))
+                .ToListAsync();
+
+            var refreshTokens = await _context.RefreshTokens
+                .Where(token => token.UserId == user.ID)
+                .ToListAsync();
+
+            var ownedItems = await _context.Items
+                .Where(item => item.UserId == user.ID)
+                .ToListAsync();
+
+            _context.Ratings.RemoveRange(relatedRatings);
+            _context.RefreshTokens.RemoveRange(refreshTokens);
+            _context.Items.RemoveRange(ownedItems);
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
+
             return Ok("User deleted successfully!");
+        }
+
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue("sub");
+        }
+
+        private async Task<User?> GetCurrentUserAsync()
+        {
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return null;
+            }
+
+            return await _context.Users.FindAsync(userId);
         }
     }
 }

@@ -1,54 +1,159 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Frontend</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
+﻿@using System.Net.Http.Json
+@using Frontend.Services
+@inject HttpClient Http
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+<nav class="navbar">
+    <div class="nav-container">
+        <button class="hamburger @(isOpen ? "active" : "")" @onclick="ToggleNavMenu" title="Navigation menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <div class="nav-menu @(isOpen ? "active" : "")">
+            <NavLink href="" class="nav-link" @onclick="CloseMenu" Match="NavLinkMatch.All">
+                Home
+            </NavLink>
+            <NavLink href="leaderboard" class="nav-link" @onclick="CloseMenu">
+                Leaderboard
+            </NavLink>
+            <NavLink href="items" class="nav-link" @onclick="CloseMenu">
+                Items
+            </NavLink>
+            <NavLink href="users" class="nav-link" @onclick="CloseMenu">
+                Brugere
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
+
+        <div class="nav-auth">
+            @if (isLoggedIn)
+            {
+                <NavLink href="my-profile" class="nav-link nav-link-profile" @onclick="CloseMenu">
+                    Min bruger
+                </NavLink>
+                <span class="user-greeting">@userDisplay</span>
+                <button class="btn-logout" @onclick="Logout">Logout</button>
+            }
+            else
+            {
+                <NavLink href="login" class="btn-icon-login" title="Login" aria-label="Login">
+                    <span class="icon-login" aria-hidden="true"></span>
+                </NavLink>
+            }
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="login">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Login
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="signup">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Sign up
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="leaderboard">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Leaderboard
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    </div>
+</nav>
 
 @code {
-    private bool collapseNavMenu = true;
+    private bool isOpen = false;
+    private bool isLoggedIn = false;
+    private string userDisplay = string.Empty;
+    
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    protected override async Task OnInitializedAsync()
+    {
+        AuthService.AuthStateChanged += HandleAuthStateChanged;
+        await CheckAuthStatus();
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= HandleAuthStateChanged;
+    }
+
+    private async Task CheckAuthStatus()
+    {
+        var token = await AuthService.GetTokenAsync();
+        isLoggedIn = !string.IsNullOrWhiteSpace(token);
+        userDisplay = string.Empty;
+
+        if (!isLoggedIn || token == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+            await AuthService.ApplyAuthorizationHeaderAsync(request);
+
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var profile = await response.Content.ReadFromJsonAsync<UserProfileDto>();
+                userDisplay = profile?.Username ?? profile?.Email ?? "Logget ind";
+                return;
+            }
+        }
+        catch
+        {
+            // Fall back to token parsing if the profile endpoint is unavailable.
+        }
+
+        userDisplay = ExtractEmailFromJwt(token) ?? "Logget ind";
+    }
+
+    private static string? ExtractEmailFromJwt(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length != 3)
+                return null;
+
+            var payload = parts[1];
+            payload = payload.Replace("-", "+").Replace("_", "/");
+            payload += new string('=', (4 - payload.Length % 4) % 4);
+
+            var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+            using var doc = System.Text.Json.JsonDocument.Parse(decoded);
+
+            if (doc.RootElement.TryGetProperty("email", out var emailElement))
+            {
+                return emailElement.GetString();
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private void ToggleNavMenu()
     {
-        collapseNavMenu = !collapseNavMenu;
+        isOpen = !isOpen;
+    }
+
+    private void CloseMenu()
+    {
+        isOpen = false;
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.ClearTokenAsync();
+        isLoggedIn = false;
+        userDisplay = string.Empty;
+        CloseMenu();
+        NavigationManager.NavigateTo("/");
+    }
+
+    private async void HandleAuthStateChanged()
+    {
+        await CheckAuthStatus();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private sealed class UserProfileDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

@@ -2,6 +2,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Frontend.Services
 @inject AuthService AuthService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Sign up</PageTitle>
 
@@ -9,7 +10,7 @@
 	<div class="card auth-card auth-card-signup shadow-sm">
 		<div class="card-body p-4 p-md-5">
 			<h1 class="h3 mb-2">Opret bruger</h1>
-			<p class="text-muted mb-4">Udfyld felterne herunder for at oprette en konto.</p>
+			<p class="text-muted mb-4">Har ikke en bruger endnu? Udfyld felterne herunder for at oprette en konto.</p>
 
 			<EditForm Model="_model" OnValidSubmit="HandleSignUp">
 				<DataAnnotationsValidator />
@@ -87,15 +88,14 @@
 		_errorMessage = string.Empty;
 		_successMessage = string.Empty;
 
-		var result = await AuthService.SignUpAsync(_model.FullName, _model.Email, _model.Password);
+		var result = await AuthService.SignUpAsync(_model.FullName, _model.Email, _model.Password, _model.ConfirmPassword);
 		
 		_isLoading = false;
 
 		if (result.Success)
 		{
 			_successMessage = "Bruger oprettet. Viderestiller...";
-			// TODO: Gem token, rediriger bruger
-			// NavigationManager.NavigateTo("/login");
+			NavigationManager.NavigateTo("/login");
 		}
 		else
 		{
@@ -114,7 +114,7 @@
 		public string Email { get; set; } = string.Empty;
 
 		[Required(ErrorMessage = "Kodeord er påkrævet.")]
-		[MinLength(8, ErrorMessage = "Kodeord skal mindst være 8 tegn.")]
+		[RegularExpression("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*\\W).{8,32}$", ErrorMessage = "Kodeord skal være 8-32 tegn og indeholde stort/lille bogstav, tal og specialtegn.")]
 		public string Password { get; set; } = string.Empty;
 
 		[Required(ErrorMessage = "Bekræft kodeord.")]

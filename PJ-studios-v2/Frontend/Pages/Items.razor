@@ -1,0 +1,270 @@
+@page "/items"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject Frontend.Services.AuthService AuthService
+
+<PageTitle>Items</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="mb-1">Items</h1>
+        <p class="text-muted mb-0">Se, søg og opret items.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ToggleCreateForm">
+        @(_showCreateForm ? "Luk opret" : "Opret nyt item")
+    </button>
+</div>
+
+@if (_showCreateForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5">Nyt item</h2>
+            <div class="mb-3">
+                <label class="form-label" for="itemName">Navn</label>
+                <input id="itemName" class="form-control" @bind="_newItemName" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="itemDescription">Beskrivelse</label>
+                <textarea id="itemDescription" class="form-control" rows="3" @bind="_newItemDescription"></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="itemImage">Billede</label>
+                <InputFile id="itemImage" class="form-control" OnChange="OnFileSelectedAsync" accept="image/*" />
+                <div class="form-text">Understøtter billeder op til 2 MB.</div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_newItemImageUrl))
+            {
+                <div class="mb-3">
+                    <img src="@_newItemImageUrl" alt="Forhaandsvisning" style="max-width: 220px; max-height: 220px; border-radius: 8px;" />
+                </div>
+            }
+            <button class="btn btn-success" @onclick="CreateItemAsync" disabled="@_isSaving">
+                @(_isSaving ? "Gemmer..." : "Gem item")
+            </button>
+        </div>
+    </div>
+}
+
+<div class="mb-3">
+    <label class="form-label" for="searchItems">Søg efter item</label>
+    <input id="searchItems" class="form-control" placeholder="Skriv navn eller beskrivelse" @bind="_searchTerm" />
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(_successMessage))
+{
+    <div class="alert alert-success" role="alert">@_successMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p><em>Loader items...</em></p>
+}
+else if (!FilteredItems.Any())
+{
+    <div class="alert alert-info" role="alert">Ingen items matcher din søgning.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Billede</th>
+                <th>Navn</th>
+                <th>Beskrivelse</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in FilteredItems)
+            {
+                <tr style="cursor: pointer;" @onclick="() => GoToItemDetails(item.Id)">
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
+                        {
+                            <img src="@item.ImageUrl" alt="@item.Name" style="width: 72px; height: 72px; object-fit: cover; border-radius: 8px;" />
+                        }
+                    </td>
+                    <td>@item.Name</td>
+                    <td>@item.Description</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private readonly List<ItemDto> _items = new();
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _showCreateForm;
+    private string _searchTerm = string.Empty;
+    private string _newItemName = string.Empty;
+    private string _newItemDescription = string.Empty;
+    private string _newItemImageUrl = string.Empty;
+    private string _errorMessage = string.Empty;
+    private string _successMessage = string.Empty;
+
+    private IEnumerable<ItemDto> FilteredItems =>
+        _items.Where(i =>
+            string.IsNullOrWhiteSpace(_searchTerm)
+            || i.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)
+            || i.Description.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItemsAsync();
+    }
+
+    private async Task LoadItemsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            var items = await Http.GetFromJsonAsync<List<ItemDto>>("/api/item") ?? new List<ItemDto>();
+            _items.Clear();
+            _items.AddRange(items.OrderBy(i => i.Name));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke hente items: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ToggleCreateForm()
+    {
+        _showCreateForm = !_showCreateForm;
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+    }
+
+    private async Task CreateItemAsync()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+
+        var token = await AuthService.GetTokenAsync();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _errorMessage = "Du skal være logget ind for at oprette et item.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newItemName))
+        {
+            _errorMessage = "Navn er paakraevet.";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var request = new CreateItemRequest
+            {
+                Name = _newItemName.Trim(),
+                Description = _newItemDescription.Trim(),
+                ImageUrl = _newItemImageUrl
+            };
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/item")
+            {
+                Content = JsonContent.Create(request)
+            };
+            await AuthService.ApplyAuthorizationHeaderAsync(httpRequest);
+
+            var response = await Http.SendAsync(httpRequest);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = $"Kunne ikke oprette item: {(int)response.StatusCode} {response.StatusCode}";
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<ItemDto>();
+            if (created != null)
+            {
+                _items.Add(created);
+                _items.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            }
+
+            _newItemName = string.Empty;
+            _newItemDescription = string.Empty;
+            _newItemImageUrl = string.Empty;
+            _showCreateForm = false;
+            _successMessage = "Item oprettet.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kunne ikke oprette item: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        _errorMessage = string.Empty;
+
+        var file = e.File;
+        if (file == null)
+        {
+            _newItemImageUrl = string.Empty;
+            return;
+        }
+
+        const long maxFileSize = 2 * 1024 * 1024;
+        if (file.Size > maxFileSize)
+        {
+            _newItemImageUrl = string.Empty;
+            _errorMessage = "Billedet er for stort. Maks 2 MB.";
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+
+            var base64 = Convert.ToBase64String(ms.ToArray());
+            _newItemImageUrl = $"data:{file.ContentType};base64,{base64}";
+        }
+        catch (Exception ex)
+        {
+            _newItemImageUrl = string.Empty;
+            _errorMessage = $"Kunne ikke laese billedet: {ex.Message}";
+        }
+    }
+
+    private sealed class ItemDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+    }
+
+    private sealed class CreateItemRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+    }
+
+    private void GoToItemDetails(string itemId)
+    {
+        NavigationManager.NavigateTo($"/item/{itemId}");
+    }
+}
