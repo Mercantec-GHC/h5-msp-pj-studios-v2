@@ -30,8 +30,26 @@
                 <textarea id="itemDescription" class="form-control" rows="3" @bind="_newItemDescription"></textarea>
             </div>
             <div class="mb-3">
-                <label class="form-label" for="itemTags">Tags (komma-separeret)</label>
-                <input id="itemTags" class="form-control" @bind="_newItemTags" placeholder="f.eks. monster, sejt" />
+                <label class="form-label">Tags</label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach (var tag in _newItemTags)
+                    {
+                        <span class="badge bg-primary d-flex align-items-center">
+                            @tag
+                            <button type="button" class="btn-close btn-close-white ms-2" aria-label="Slet" style="font-size: 0.5rem;" @onclick="() => RemoveTag(tag)"></button>
+                        </span>
+                    }
+                </div>
+                <div class="input-group">
+                    <input list="availableTagsList" class="form-control" @bind="_currentTagInput" placeholder="Søg eller tilføj et tag..." @onkeyup="HandleTagInputKeyUp" />
+                    <button class="btn btn-outline-secondary" type="button" @onclick="AddTag">Tilføj</button>
+                    <datalist id="availableTagsList">
+                        @foreach (var tag in _availableTags)
+                        {
+                            <option value="@tag"></option>
+                        }
+                    </datalist>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label" for="itemImage">Billede</label>
@@ -110,7 +128,9 @@ else
     private string _searchTerm = string.Empty;
     private string _newItemName = string.Empty;
     private string _newItemDescription = string.Empty;
-    private string _newItemTags = string.Empty;
+    private List<string> _newItemTags = new();
+    private string _currentTagInput = string.Empty;
+    private List<string> _availableTags = new();
     private string _newItemImageUrl = string.Empty;
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
@@ -136,6 +156,9 @@ else
             var items = await Http.GetFromJsonAsync<List<ItemDto>>("/api/item") ?? new List<ItemDto>();
             _items.Clear();
             _items.AddRange(items.OrderBy(i => i.Name));
+
+            var tags = await Http.GetFromJsonAsync<List<string>>("/api/item/tags") ?? new List<string>();
+            _availableTags = tags;
         }
         catch (Exception ex)
         {
@@ -152,6 +175,32 @@ else
         _showCreateForm = !_showCreateForm;
         _errorMessage = string.Empty;
         _successMessage = string.Empty;
+    }
+
+    private void AddTag()
+    {
+        if (!string.IsNullOrWhiteSpace(_currentTagInput))
+        {
+            var tag = _currentTagInput.Trim().ToLower();
+            if (!_newItemTags.Contains(tag))
+            {
+                _newItemTags.Add(tag);
+            }
+            _currentTagInput = string.Empty;
+        }
+    }
+
+    private void RemoveTag(string tag)
+    {
+        _newItemTags.Remove(tag);
+    }
+
+    private void HandleTagInputKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddTag();
+        }
     }
 
     private async Task CreateItemAsync()
@@ -180,7 +229,7 @@ else
                 Name = _newItemName.Trim(),
                 Description = _newItemDescription.Trim(),
                 ImageUrl = _newItemImageUrl,
-                Tags = _newItemTags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
+                Tags = _newItemTags
             };
 
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/item")
@@ -206,7 +255,8 @@ else
             _newItemName = string.Empty;
             _newItemDescription = string.Empty;
             _newItemImageUrl = string.Empty;
-            _newItemTags = string.Empty;
+            _newItemTags.Clear();
+            _currentTagInput = string.Empty;
             _showCreateForm = false;
             _successMessage = "Item oprettet.";
         }

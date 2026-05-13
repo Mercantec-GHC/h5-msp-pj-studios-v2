@@ -69,8 +69,26 @@ else
                             <textarea id="editDescription" class="form-control" rows="4" @bind="_editDescription"></textarea>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label" for="editTags">Tags (komma-separeret)</label>
-                            <input id="editTags" class="form-control" @bind="_editTags" placeholder="f.eks. monster, sejt" />
+                            <label class="form-label">Tags</label>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                @foreach (var tag in _editTags)
+                                {
+                                    <span class="badge bg-primary d-flex align-items-center">
+                                        @tag
+                                        <button type="button" class="btn-close btn-close-white ms-2" aria-label="Slet" style="font-size: 0.5rem;" @onclick="() => RemoveTag(tag)"></button>
+                                    </span>
+                                }
+                            </div>
+                            <div class="input-group">
+                                <input list="availableTagsListDetails" class="form-control" @bind="_currentTagInput" placeholder="Søg eller tilføj et tag..." @onkeyup="HandleTagInputKeyUp" />
+                                <button class="btn btn-outline-secondary" type="button" @onclick="AddTag">Tilføj</button>
+                                <datalist id="availableTagsListDetails">
+                                    @foreach (var tag in _availableTags)
+                                    {
+                                        <option value="@tag"></option>
+                                    }
+                                </datalist>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="editImageUrl">Billede URL</label>
@@ -162,7 +180,9 @@ else
     private string _editName = string.Empty;
     private string _editDescription = string.Empty;
     private string _editImageUrl = string.Empty;
-    private string _editTags = string.Empty;
+    private List<string> _editTags = new();
+    private string _currentTagInput = string.Empty;
+    private List<string> _availableTags = new();
     private string _errorMessage = string.Empty;
     private string _successMessage = string.Empty;
     private List<RatingDto> _allRatings = new();
@@ -193,6 +213,9 @@ else
                 {
                     _allRatings = await response.Content.ReadFromJsonAsync<List<RatingDto>>() ?? new List<RatingDto>();
                 }
+
+                var tagsResponse = await Http.GetFromJsonAsync<List<string>>("/api/item/tags") ?? new List<string>();
+                _availableTags = tagsResponse;
 
                 var userId = await AuthService.GetUserIdAsync();
                 if (!string.IsNullOrWhiteSpace(userId))
@@ -283,7 +306,34 @@ else
             _editName = _item.Name;
             _editDescription = _item.Description;
             _editImageUrl = _item.ImageUrl;
-            _editTags = _item.Tags != null ? string.Join(", ", _item.Tags) : string.Empty;
+            _editTags = _item.Tags != null ? _item.Tags.ToList() : new List<string>();
+            _currentTagInput = string.Empty;
+        }
+    }
+
+    private void AddTag()
+    {
+        if (!string.IsNullOrWhiteSpace(_currentTagInput))
+        {
+            var tag = _currentTagInput.Trim().ToLower();
+            if (!_editTags.Contains(tag))
+            {
+                _editTags.Add(tag);
+            }
+            _currentTagInput = string.Empty;
+        }
+    }
+
+    private void RemoveTag(string tag)
+    {
+        _editTags.Remove(tag);
+    }
+
+    private void HandleTagInputKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddTag();
         }
     }
 
@@ -314,7 +364,7 @@ else
                     Name = _editName.Trim(),
                     Description = _editDescription.Trim(),
                     ImageUrl = _editImageUrl.Trim(),
-                    Tags = _editTags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
+                    Tags = _editTags
                 })
             };
 

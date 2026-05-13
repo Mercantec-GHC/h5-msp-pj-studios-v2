@@ -25,6 +25,18 @@ namespace Backend.Controllers
             return Ok(items);
         }
 
+        [HttpGet("tags")]
+        public async Task<IActionResult> GetAllTags()
+        {
+            var tags = await _context.Items
+                .SelectMany(i => i.Tags)
+                .Distinct()
+                .OrderBy(t => t)
+                .ToListAsync();
+
+            return Ok(tags);
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetItem(string id)
         {
