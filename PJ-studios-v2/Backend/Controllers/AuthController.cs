@@ -77,8 +77,6 @@ namespace Backend.Controllers
         }
 
 
-        [HttpGet("me")]
-        public async Task<IActionResult> GetCurrentUser()
         [HttpGet("users/{id}")]
         public async Task<ActionResult<UserProfileDTO>> GetUserById(string id)
         {
@@ -302,7 +300,7 @@ namespace Backend.Controllers
             {
                 return Unauthorized("User not found.");
             }
-
+            var userId = GetCurrentUserId();
             if (userId == null)
             {
                 return Unauthorized("Missing userId claim.");

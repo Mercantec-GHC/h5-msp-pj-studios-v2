@@ -101,10 +101,38 @@ else
         {
             ratings = new List<RatingDto>();
         }
+        else if (!response.IsSuccessStatusCode)
+        {
+            // Non-success (500, 403, etc.) — try to parse JSON, otherwise treat as empty.
+            try
+            {
+                ratings = await response.Content.ReadFromJsonAsync<List<RatingDto>>() ?? new List<RatingDto>();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                ratings = new List<RatingDto>();
+            }
+        }
         else
         {
-            response.EnsureSuccessStatusCode();
-            ratings = await response.Content.ReadFromJsonAsync<List<RatingDto>>() ?? new List<RatingDto>();
+            try
+            {
+                ratings = await response.Content.ReadFromJsonAsync<List<RatingDto>>() ?? new List<RatingDto>();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // Response wasn't valid JSON (often HTML error page). Read raw and treat as empty.
+                var raw = await response.Content.ReadAsStringAsync();
+                if (!string.IsNullOrWhiteSpace(raw) && raw.TrimStart().StartsWith("<"))
+                {
+                    // HTML returned (probably an error page) — treat as no ratings
+                    ratings = new List<RatingDto>();
+                }
+                else
+                {
+                    ratings = new List<RatingDto>();
+                }
+            }
         }
 
         var average = ratings.Count > 0 ? ratings.Average(r => r.Score) : 0;
