@@ -7,10 +7,44 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var jwt = builder.Configuration.GetSection("Jwt");
+// Load environment variables into configuration
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrEmpty(jwtKey))
+{
+    jwtKey = Environment.GetEnvironmentVariable("JWT_KEY") ?? "";
+    builder.Configuration["Jwt:Key"] = jwtKey;
+}
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrEmpty(connectionString))
+{
+    connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "";
+}
+
+var mailPassword = builder.Configuration["MailSettings:Password"];
+if (string.IsNullOrEmpty(mailPassword))
+{
+    mailPassword = Environment.GetEnvironmentVariable("MAIL_PASSWORD") ?? "";
+    builder.Configuration["MailSettings:Password"] = mailPassword;
+}
+
+var mailFrom = builder.Configuration["MailSettings:From"];
+if (string.IsNullOrEmpty(mailFrom))
+{
+    mailFrom = Environment.GetEnvironmentVariable("MAIL_FROM") ?? "";
+    builder.Configuration["MailSettings:From"] = mailFrom;
+}
+
+var jwt = builder.Configuration.GetSection("Jwt");
 
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
+
+// Configure Heroku port
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    builder.WebHost.UseUrls($"http://*:{port}");
+}
 
 builder.Services.AddControllers();
 
@@ -35,7 +69,7 @@ builder.Services
             ValidIssuer = jwt["Issuer"],
             ValidAudience = jwt["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwt["Key"]!)
+                Encoding.UTF8.GetBytes(jwtKey)
             )
         };
     });
@@ -121,7 +155,11 @@ app.ApplyMigrations();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+// Only redirect to HTTPS in development
+if (!app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors(FrontendCorsPolicy);
 
