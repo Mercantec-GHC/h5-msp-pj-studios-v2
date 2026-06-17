@@ -9,11 +9,10 @@ WORKDIR /src/PJ-studios-v2/Frontend
 RUN dotnet publish Frontend.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 FROM nginx:1.27-alpine
-ENV PORT=8080
 
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot/ ./
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["sh", "-c", "PORT=${PORT:-8080}; envsubst '$PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
