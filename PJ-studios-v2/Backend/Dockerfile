@@ -9,10 +9,10 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["PJ-studios-v2/Backend/Backend.csproj", "PJ-studios-v2/Backend/"]
-RUN dotnet restore "PJ-studios-v2/Backend/Backend.csproj"
+COPY ["Backend.csproj", "./"]
+RUN dotnet restore "Backend.csproj"
 COPY . .
-WORKDIR "/src/PJ-studios-v2/Backend"
+WORKDIR "/src"
 RUN dotnet build "./Backend.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # This stage is used to publish the service project to be copied to the final stage
