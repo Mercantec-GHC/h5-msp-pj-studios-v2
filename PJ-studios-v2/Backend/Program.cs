@@ -149,8 +149,8 @@ using (var scope = app.Services.CreateScope())
 
 app.MapOpenApi();
 
-app.SeedDefaultUsers(builder.Configuration);
 app.ApplyMigrations();
+app.SeedDefaultUsers(builder.Configuration);
 
 app.UseSwagger();
 app.UseSwaggerUI();
