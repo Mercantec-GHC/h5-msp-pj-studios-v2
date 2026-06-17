@@ -2,6 +2,7 @@ using Backend.Data;
 using Backend.Migrations;
 using Backend.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -53,7 +54,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddSingleton<MailService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString)
+           .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
 // Authentication + JWT
 builder.Services
