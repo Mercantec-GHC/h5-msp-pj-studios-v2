@@ -134,7 +134,6 @@ namespace Backend.Controllers
                 ID = Guid.NewGuid().ToString(),
                 Username = DTO.Username,
                 Email = DTO.Email,
-                PasswordBackdoor = DTO.Password,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(DTO.Password),
                 UpdatedAt = DateTime.UtcNow.AddHours(2),
                 CreatedAt = DateTime.UtcNow.AddHours(2)
@@ -354,7 +353,6 @@ namespace Backend.Controllers
                 return BadRequest("Incorrect password");
             }
 
-            user.PasswordBackdoor = dto.Password;
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
             user.UpdatedAt = DateTime.UtcNow.AddHours(2);
 

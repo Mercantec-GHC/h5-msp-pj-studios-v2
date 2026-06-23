@@ -16,7 +16,6 @@ namespace Backend.Migrations
                     ""ID"" text PRIMARY KEY,
                     ""Username"" text NOT NULL,
                     ""Email"" text NOT NULL,
-                    ""PasswordBackdoor"" text NOT NULL,
                     ""PasswordHash"" text NOT NULL,
                     ""LoginAttempts"" integer NOT NULL DEFAULT 0,
                     ""LastFailedLogin"" timestamp with time zone NULL,
@@ -87,7 +86,6 @@ namespace Backend.Migrations
                     ID = Guid.NewGuid().ToString(),
                     Username = username,
                     Email = email,
-                    PasswordBackdoor = password,
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
                     UpdatedAt = DateTime.UtcNow.AddHours(2),
                     CreatedAt = DateTime.UtcNow.AddHours(2)
