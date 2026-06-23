@@ -21,21 +21,25 @@ namespace Backend.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllItems()
         {
-            var items = await _context.Items
-                .Include(i => i.User)
-                .Include(i => i.Ratings)
-                .Select(i => new ItemResponseDto
+            var items = await (
+                from item in _context.Items
+                join user in _context.Users on item.UserId equals user.ID into userGroup
+                from user in userGroup.DefaultIfEmpty()
+                select new ItemResponseDto
                 {
-                    Id = i.Id,
-                    UserId = i.UserId,
-                    CreatedByUsername = i.User != null ? i.User.Username : "Ukendt bruger",
-                    Name = i.Name,
-                    Description = i.Description,
-                    ImageUrl = i.ImageUrl,
-                    AverageRating = i.Ratings.Any() ? i.Ratings.Average(r => r.Score) : 0,
-                    RatingCount = i.Ratings.Count
-                })
-                .ToListAsync();
+                    Id = item.Id,
+                    UserId = item.UserId,
+                    CreatedByUsername = user != null ? user.Username : "Ukendt bruger",
+                    Name = item.Name,
+                    Description = item.Description,
+                    ImageUrl = item.ImageUrl,
+                    AverageRating = _context.Ratings
+                        .Where(r => r.ItemId == item.Id)
+                        .Select(r => (decimal?)r.Score)
+                        .Average() ?? 0,
+                    RatingCount = _context.Ratings.Count(r => r.ItemId == item.Id)
+                }
+            ).ToListAsync();
 
             return Ok(items);
         }
@@ -43,22 +47,26 @@ namespace Backend.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetItem(string id)
         {
-            var item = await _context.Items
-                .Include(i => i.User)
-                .Include(i => i.Ratings)
-                .Where(i => i.Id == id)
-                .Select(i => new ItemResponseDto
+            var item = await (
+                from i in _context.Items
+                join user in _context.Users on i.UserId equals user.ID into userGroup
+                from user in userGroup.DefaultIfEmpty()
+                where i.Id == id
+                select new ItemResponseDto
                 {
                     Id = i.Id,
                     UserId = i.UserId,
-                    CreatedByUsername = i.User != null ? i.User.Username : "Ukendt bruger",
+                    CreatedByUsername = user != null ? user.Username : "Ukendt bruger",
                     Name = i.Name,
                     Description = i.Description,
                     ImageUrl = i.ImageUrl,
-                    AverageRating = i.Ratings.Any() ? i.Ratings.Average(r => r.Score) : 0,
-                    RatingCount = i.Ratings.Count
-                })
-                .FirstOrDefaultAsync();
+                    AverageRating = _context.Ratings
+                        .Where(r => r.ItemId == i.Id)
+                        .Select(r => (decimal?)r.Score)
+                        .Average() ?? 0,
+                    RatingCount = _context.Ratings.Count(r => r.ItemId == i.Id)
+                }
+            ).FirstOrDefaultAsync();
 
             if (item == null)
             {
@@ -88,7 +96,17 @@ namespace Backend.Controllers
             _context.Items.Add(item);
             await _context.SaveChangesAsync();
 
-            return Ok(item);
+            return Ok(new ItemResponseDto
+            {
+                Id = item.Id,
+                UserId = item.UserId,
+                CreatedByUsername = User.Identity?.Name ?? "Ukendt bruger",
+                Name = item.Name,
+                Description = item.Description,
+                ImageUrl = item.ImageUrl,
+                AverageRating = 0,
+                RatingCount = 0
+            });
         }
 
         [HttpPut("{id}")]
@@ -142,7 +160,13 @@ namespace Backend.Controllers
                 return Forbid();
             }
 
+            var ratings = await _context.Ratings
+                .Where(r => r.ItemId == item.Id)
+                .ToListAsync();
+
+            _context.Ratings.RemoveRange(ratings);
             _context.Items.Remove(item);
+
             await _context.SaveChangesAsync();
 
             return NoContent();
