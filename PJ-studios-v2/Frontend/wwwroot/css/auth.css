@@ -1,0 +1,28 @@
+.auth-page {
+    min-height: calc(100vh - 3.5rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+}
+
+.auth-card {
+    width: 100%;
+    border: 1px solid;
+    border-radius: 1rem;
+}
+
+.auth-page .form-control {
+    border-radius: 0.65rem;
+}
+
+.auth-page .btn {
+    border-radius: 0.65rem;
+    font-weight: 600;
+}
+
+@media (max-width: 576px) {
+    .auth-page {
+        padding: 1rem;
+    }
+}
