@@ -335,7 +335,7 @@ namespace Backend.Controllers
 
         [Authorize]
         [HttpPut("updatePassword")]
-        public async Task<IActionResult> UpdatePassword(UpdateUserPasswordDTO dto)
+        public async Task<IActionResult> UpdatePassword([FromBody] UpdateUserPasswordDTO dto)
         {
             if (dto == null)
             {
@@ -350,7 +350,7 @@ namespace Backend.Controllers
 
             if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
             {
-                return BadRequest("Incorrect password");
+                return BadRequest("Incorrect current password.");
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
@@ -365,17 +365,17 @@ namespace Backend.Controllers
 
         [Authorize]
         [HttpDelete("deleteUser")]
-        public async Task<IActionResult> DeleteUser(string Password)
+        public async Task<IActionResult> DeleteUser([FromBody] DeleteUserDTO dto)
         {
             var user = await GetCurrentUserAsync();
             if (user == null)
             {
-                return Unauthorized("User not found");
+                return Unauthorized("User not found.");
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
+            if (dto == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             {
-                return BadRequest("Incorrect password");
+                return BadRequest("Incorrect password.");
             }
 
             var ownedItemIds = await _context.Items
@@ -399,6 +399,7 @@ namespace Backend.Controllers
             _context.RefreshTokens.RemoveRange(refreshTokens);
             _context.Items.RemoveRange(ownedItems);
             _context.Users.Remove(user);
+
             await _context.SaveChangesAsync();
 
             return Ok("User deleted successfully!");

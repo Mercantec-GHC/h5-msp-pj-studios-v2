@@ -21,18 +21,50 @@ namespace Backend.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllItems()
         {
-            var items = await _context.Items.ToListAsync();
+            var items = await _context.Items
+                .Include(i => i.User)
+                .Include(i => i.Ratings)
+                .Select(i => new ItemResponseDto
+                {
+                    Id = i.Id,
+                    UserId = i.UserId,
+                    CreatedByUsername = i.User != null ? i.User.Username : "Ukendt bruger",
+                    Name = i.Name,
+                    Description = i.Description,
+                    ImageUrl = i.ImageUrl,
+                    AverageRating = i.Ratings.Any() ? i.Ratings.Average(r => r.Score) : 0,
+                    RatingCount = i.Ratings.Count
+                })
+                .ToListAsync();
+
             return Ok(items);
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetItem(string id)
         {
-            var item = await _context.Items.FirstOrDefaultAsync(i => i.Id == id);
+            var item = await _context.Items
+                .Include(i => i.User)
+                .Include(i => i.Ratings)
+                .Where(i => i.Id == id)
+                .Select(i => new ItemResponseDto
+                {
+                    Id = i.Id,
+                    UserId = i.UserId,
+                    CreatedByUsername = i.User != null ? i.User.Username : "Ukendt bruger",
+                    Name = i.Name,
+                    Description = i.Description,
+                    ImageUrl = i.ImageUrl,
+                    AverageRating = i.Ratings.Any() ? i.Ratings.Average(r => r.Score) : 0,
+                    RatingCount = i.Ratings.Count
+                })
+                .FirstOrDefaultAsync();
+
             if (item == null)
             {
                 return NotFound("Item blev ikke fundet.");
             }
+
             return Ok(item);
         }
 

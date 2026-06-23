@@ -20,9 +20,9 @@ public class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<ItemModel>()
-            .HasMany(i => i.Ratings)
-            .WithOne()
-            .HasForeignKey(r => r.ItemId)
-            .HasPrincipalKey(i => i.Id);
+    .HasOne(i => i.User)
+    .WithMany()
+    .HasForeignKey(i => i.UserId)
+    .HasPrincipalKey(u => u.ID);
     }
 }
