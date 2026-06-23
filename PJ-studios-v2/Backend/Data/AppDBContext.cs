@@ -14,4 +14,15 @@ public class AppDbContext : DbContext
     public DbSet<ItemModel> Items { get; set; }
     public DbSet<RatingsModel> Ratings { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ItemModel>()
+            .HasMany(i => i.Ratings)
+            .WithOne()
+            .HasForeignKey(r => r.ItemId)
+            .HasPrincipalKey(i => i.Id);
+    }
 }
