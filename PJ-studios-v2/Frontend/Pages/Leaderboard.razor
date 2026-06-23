@@ -177,7 +177,7 @@ else
 
     private sealed class RatingDto
     {
-        public int Score { get; set; }
+        public decimal Score { get; set; }
     }
 
     private sealed class LeaderboardEntry
@@ -186,7 +186,7 @@ else
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
-        public double AverageRating { get; set; }
+        public decimal AverageRating { get; set; }
         public int RatingCount { get; set; }
     }
 
