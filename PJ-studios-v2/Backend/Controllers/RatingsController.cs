@@ -25,7 +25,13 @@ namespace Backend.Controllers
             }
 
             var existingRating = await _context.Ratings
-                .SingleOrDefaultAsync(r => r.ItemId == model.ItemId && r.UserId == model.UserId);
+                .FromSqlInterpolated($@"
+                    SELECT ""Id"", ""ItemId"", ""UserId"", ""Score""
+                    FROM ""Ratings""
+                    WHERE ""ItemId"" = {model.ItemId} AND ""UserId"" = {model.UserId}
+                    LIMIT 1
+                ")
+                .SingleOrDefaultAsync();
 
             if (existingRating != null)
             {
@@ -45,48 +51,51 @@ namespace Backend.Controllers
         [HttpGet("item/{itemId}")]
         public async Task<IActionResult> GetRatingsForItem(string itemId)
         {
-            var itemRatings = await BuildRatingsResponseQuery()
-                .Where(r => r.ItemId == itemId)
+            var ratings = await _context.Ratings
+                .FromSqlInterpolated($@"
+                    SELECT ""Id"", ""ItemId"", ""UserId"", ""Score""
+                    FROM ""Ratings""
+                    WHERE ""ItemId"" = {itemId}
+                ")
                 .ToListAsync();
-            if (!itemRatings.Any())
+
+            if (!ratings.Any())
             {
                 return NotFound("Ingen ratings fundet for dette item.");
             }
 
-            return Ok(itemRatings);
+            var result = new List<RatingResponseDto>();
+            foreach (var rating in ratings)
+            {
+                result.Add(await BuildRatingResponseAsync(rating));
+            }
+
+            return Ok(result);
         }
 
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetRatingsForUser(string userId)
         {
-            var userRatings = await BuildRatingsResponseQuery()
-                .Where(r => r.UserId == userId)
+            var ratings = await _context.Ratings
+                .FromSqlInterpolated($@"
+                    SELECT ""Id"", ""ItemId"", ""UserId"", ""Score""
+                    FROM ""Ratings""
+                    WHERE ""UserId"" = {userId}
+                ")
                 .ToListAsync();
-            if (!userRatings.Any())
+
+            if (!ratings.Any())
             {
                 return NotFound("Ingen ratings fundet for denne bruger.");
             }
 
-            return Ok(userRatings);
-        }
+            var result = new List<RatingResponseDto>();
+            foreach (var rating in ratings)
+            {
+                result.Add(await BuildRatingResponseAsync(rating));
+            }
 
-        private IQueryable<RatingResponseDto> BuildRatingsResponseQuery()
-        {
-            return from rating in _context.Ratings
-                   join item in _context.Items on rating.ItemId equals item.Id into itemGroup
-                   from item in itemGroup.DefaultIfEmpty()
-                   join user in _context.Users on rating.UserId equals user.ID into userGroup
-                   from user in userGroup.DefaultIfEmpty()
-                   select new RatingResponseDto
-                   {
-                       Id = rating.Id,
-                       ItemId = rating.ItemId,
-                       ItemName = item != null ? item.Name : "Ukendt item",
-                       ItemImageUrl = item != null ? item.ImageUrl : string.Empty,
-                       UserId = rating.UserId,
-                       Username = user != null ? user.Username : "Ukendt bruger",
-                       Score = rating.Score
-                   };
+            return Ok(result);
         }
 
         private async Task<RatingResponseDto> BuildRatingResponseAsync(RatingsModel rating)
