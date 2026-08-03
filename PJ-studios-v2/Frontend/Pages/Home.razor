@@ -1,7 +1,122 @@
 ﻿@page "/"
 
-@using Frontend.Shared
+<PageTitle>Forside | Ud af 10</PageTitle>
 
-<PageTitle>Home</PageTitle>
+<section class="home-hero">
+    <div class="hero-glow hero-glow-one"></div>
+    <div class="hero-glow hero-glow-two"></div>
 
-<PictureOfDay />
+    <div class="hero-content">
+        <span class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            Din mening tæller
+        </span>
+
+        <h1>
+            Hvor godt er det<br />
+            <span>ud af 10?</span>
+        </h1>
+
+        <p class="hero-copy">
+            Opdag nye ting, giv din ærlige bedømmelse og se,
+            hvad fællesskabet synes fortjener førstepladsen.
+        </p>
+
+        <div class="hero-actions">
+            <a class="primary-action" href="/items">
+                Se og bedøm items
+                <span aria-hidden="true">→</span>
+            </a>
+
+            <a class="secondary-action" href="/leaderboard">
+                Se leaderboard
+            </a>
+        </div>
+
+        <div class="rating-preview"
+             aria-label="Eksempel på bedømmelse">
+            <div>
+                <span class="preview-label">DIN BEDØMMELSE</span>
+                <strong>8.7</strong>
+                <span class="out-of-ten">/10</span>
+            </div>
+
+            <div class="score-track">
+                <span></span>
+            </div>
+
+            <span class="preview-text">Virkelig godt valg</span>
+        </div>
+    </div>
+
+    <div class="hero-scoreboard" aria-hidden="true">
+        <div class="score-orbit orbit-one">
+            <span>10</span>
+        </div>
+
+        <div class="score-orbit orbit-two">
+            <span>7</span>
+        </div>
+
+        <div class="score-orbit orbit-three">
+            <span>9</span>
+        </div>
+
+        <div class="score-center">
+            <span class="score-kicker">UD AF</span>
+            <strong>10</strong>
+            <span class="score-caption">Hvad giver du?</span>
+        </div>
+    </div>
+</section>
+
+<section class="how-it-works" aria-labelledby="how-title">
+    <div class="section-heading">
+        <span>HELT ENKELT</span>
+        <h2 id="how-title">Fra mening til topplacering</h2>
+        <p>
+            Tre hurtige skridt – så er din stemme med til at forme listen.
+        </p>
+    </div>
+
+    <div class="steps-grid">
+        <a class="step-card" href="/items">
+            <span class="step-number">01</span>
+            <span class="step-icon">⌕</span>
+
+            <h3>Find noget</h3>
+
+            <p>
+                Gå på opdagelse blandt de items, andre har oprettet.
+            </p>
+
+            <span class="step-link">Udforsk items →</span>
+        </a>
+
+        <a class="step-card featured" href="/items">
+            <span class="step-number">02</span>
+            <span class="step-icon">★</span>
+
+            <h3>Giv din score</h3>
+
+            <p>
+                Vælg et tal fra 1 til 10 og del din ærlige vurdering.
+            </p>
+
+            <span class="step-link">Bedøm nu →</span>
+        </a>
+
+        <a class="step-card" href="/leaderboard">
+            <span class="step-number">03</span>
+            <span class="step-icon">↗</span>
+
+            <h3>Se resultatet</h3>
+
+            <p>
+                Følg med i hvilke items, der klarer sig bedst samlet.
+            </p>
+
+            <span class="step-link">Se ranglisten →</span>
+        </a>
+    </div>
+</section>
